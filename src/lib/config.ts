@@ -3,15 +3,15 @@ import fs from 'fs';
 import path from 'path';
 import { AppConfig, TeamConfig } from './types';
 
-// Use Upstash Redis if env vars are set (Vercel), otherwise fall back to local filesystem
-const hasKV =
-  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN;
+// Vercel's Upstash integration injects KV_REST_API_URL / KV_REST_API_TOKEN
+// Support both that and manual UPSTASH_* names
+const REST_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+const REST_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+
+const hasKV = REST_URL && REST_TOKEN;
 
 const redis = hasKV
-  ? new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL!,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-    })
+  ? new Redis({ url: REST_URL!, token: REST_TOKEN! })
   : null;
 
 const KV_KEY = 'tg:digest:config';
