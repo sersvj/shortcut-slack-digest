@@ -60,11 +60,22 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--color-border-light); border-radius: 3px; }
 
+button,
+a,
+[role="button"] {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
 /* Channel select base override */
 select {
   background-color: var(--color-surface-3);
   color: var(--color-text-primary);
   font-family: var(--font-sans);
+  cursor: pointer;
 }
 
 select option {

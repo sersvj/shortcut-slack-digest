@@ -91,12 +91,8 @@ export function CronSettingsModal({ config, onClose, onSave }: Props) {
           <div className="flex items-start gap-2.5 px-4 py-3 rounded-[8px] bg-[var(--color-surface-3)] border border-[var(--color-border)]">
             <Info size={13} className="text-[var(--color-text-muted)] mt-0.5 shrink-0" />
             <p className="text-[12px] text-[var(--color-text-muted)] leading-relaxed">
-              Configure your schedule below and save the settings. To activate automatic sends,
-              add the cron expression to{' '}
-              <code className="text-[var(--color-tg-orange)] bg-black/20 px-1 py-0.5 rounded text-[11px]">
-                vercel.json
-              </code>{' '}
-              and redeploy.
+              Set your preferred schedule below and save. Once you're happy with it,
+              reach out to Stephen to flip the switch and get automatic digests running.
             </p>
           </div>
 
