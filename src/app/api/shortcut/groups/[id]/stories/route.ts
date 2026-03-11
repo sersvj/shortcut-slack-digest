@@ -63,8 +63,8 @@ export async function GET(
     }
   }
 
-  // Filter out completed stories
-  const openStories = stories.filter((s) => !s.completed);
+  // Filter out completed and archived stories
+  const openStories = stories.filter((s) => !s.completed && !s.archived);
   const categorized = categorizeStories(openStories, memberMap, stateMap);
 
   return NextResponse.json(categorized);

@@ -23,6 +23,7 @@ export interface ShortcutStory {
   owner_ids: string[];
   workflow_state_id: number;
   completed: boolean;
+  archived: boolean;
   story_type: string;
 }
 

@@ -36,7 +36,7 @@ export function categorizeStories(
   };
 
   for (const story of stories) {
-    if (story.completed) continue;
+    if (story.completed || story.archived) continue;
 
     const owners = story.owner_ids
       .map((id) => memberMap[id])

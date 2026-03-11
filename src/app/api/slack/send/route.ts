@@ -14,7 +14,7 @@ async function fetchGroupStories(groupId: string, scToken: string): Promise<Shor
   });
   if (!res.ok) throw new Error(`Failed to fetch stories for group ${groupId}`);
   const stories: ShortcutStory[] = await res.json();
-  return stories.filter((s) => !s.completed);
+  return stories.filter((s) => !s.completed && !s.archived);
 }
 
 async function fetchMemberMap(scToken: string): Promise<Record<string, string>> {

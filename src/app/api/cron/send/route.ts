@@ -77,7 +77,7 @@ export async function GET(request: Request) {
       if (!storiesRes.ok) throw new Error(`Shortcut API error for team ${teamId}`);
 
       const stories: ShortcutStory[] = (await storiesRes.json()).filter(
-        (s: ShortcutStory) => !s.completed
+        (s: ShortcutStory) => !s.completed && !s.archived
       );
       const categorized = categorizeStories(stories, memberMap, stateMap);
       const blocks = buildSlackBlocks(teamConfig.slackChannelName || teamId, categorized);
