@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useSession, signOut } from 'next-auth/react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   RefreshCw,
   Send,
@@ -16,6 +17,7 @@ import {
 import { ShortcutGroup, CategorizedStories, SlackChannel, AppConfig, CronConfig } from '@/lib/types';
 import { ClientCard } from '@/components/ClientCard';
 import { CronSettingsModal } from '@/components/CronSettingsModal';
+import { MembersView, MembersViewHandle } from '@/components/MembersView';
 
 interface Toast {
   id: number;
@@ -26,6 +28,14 @@ interface Toast {
 let toastId = 0;
 
 export default function DashboardPage() {
+  return (
+    <Suspense>
+      <DashboardInner />
+    </Suspense>
+  );
+}
+
+function DashboardInner() {
   const { data: session } = useSession();
   const [groups, setGroups] = useState<ShortcutGroup[]>([]);
   const [config, setConfig] = useState<AppConfig>({ mappings: {} });
@@ -39,6 +49,36 @@ export default function DashboardPage() {
   const [search, setSearch] = useState('');
   const [cachedAt, setCachedAt] = useState<Date | null>(null);
   const [showCronModal, setShowCronModal] = useState(false);
+
+  // ---- URL-based view routing ----
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [activeView, setActiveView] = useState<'teams' | 'members'>(
+    () => (searchParams.get('view') === 'members' ? 'members' : 'teams')
+  );
+
+  const switchView = useCallback((view: 'teams' | 'members') => {
+    setActiveView(view);
+    const params = new URLSearchParams(Array.from(searchParams.entries()));
+    params.set('view', view);
+    router.replace(`?${params.toString()}`, { scroll: false });
+  }, [router, searchParams]);
+
+  // ---- Members view state (lifted for header bar) ----
+  const membersViewRef = useRef<MembersViewHandle>(null);
+  const [membersSearch, setMembersSearch] = useState('');
+  const [membersRefreshKey, setMembersRefreshKey] = useState(0);
+  const [membersStats, setMembersStats] = useState({ loading: true, optedInCount: 0, total: 0 });
+  const [sendingAllMembers, setSendingAllMembers] = useState(false);
+
+  const handleSendAllMembers = useCallback(async () => {
+    setSendingAllMembers(true);
+    try {
+      await membersViewRef.current?.sendAll();
+    } finally {
+      setSendingAllMembers(false);
+    }
+  }, []);
 
   const addToast = useCallback((type: 'success' | 'error', message: string) => {
     const id = ++toastId;
@@ -305,6 +345,29 @@ export default function DashboardPage() {
               </span>
               <span className="ml-2 text-[12px] text-[var(--color-text-dim)]">Shortcut × Slack</span>
             </div>
+            {/* Nav tabs */}
+            <div className="flex items-center gap-1 ml-6">
+              <button
+                onClick={() => switchView('teams')}
+                className={`px-3.5 py-1.5 rounded-[6px] text-[13px] font-medium transition-colors ${
+                  activeView === 'teams'
+                    ? 'bg-[var(--color-tg-orange)]/15 text-[var(--color-tg-orange)]'
+                    : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-3)]'
+                }`}
+              >
+                Team Tasks
+              </button>
+              <button
+                onClick={() => switchView('members')}
+                className={`px-3.5 py-1.5 rounded-[6px] text-[13px] font-medium transition-colors ${
+                  activeView === 'members'
+                    ? 'bg-[var(--color-tg-orange)]/15 text-[var(--color-tg-orange)]'
+                    : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-3)]'
+                }`}
+              >
+                Team Members
+              </button>
+            </div>
           </div>
 
           {session?.user && (
@@ -337,85 +400,153 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Action Bar: Actions & Search */}
+        {/* Contextual Action Bar */}
         <div className="flex items-center justify-between px-6 h-14 bg-[var(--color-surface-2)]/80 border-b border-[var(--color-border)]/50">
-          {/* Refresh Box */}
-          <div className="flex items-center gap-3 min-w-[200px]">
-            <button
-              onClick={() => loadAllData(true)}
-              disabled={loadingGroups}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-[6px] bg-[var(--color-surface-3)] border border-[var(--color-border)] hover:border-[var(--color-border-light)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] text-[13px] font-medium transition-colors disabled:opacity-50 shadow-sm"
-            >
-              <RefreshCw size={14} className={loadingGroups ? 'animate-spin-fast' : ''} />
-              <span>Refresh</span>
-            </button>
-            {cachedAt && !loadingGroups && (
-              <span className="text-[11px] text-[var(--color-text-dim)] font-medium tabular-nums whitespace-nowrap">
-                Updated {cachedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </span>
-            )}
-          </div>
 
-          {/* Search Box - Centered & Widened */}
-          <div className="flex-1 flex justify-center max-w-2xl px-4 mx-auto">
-            <div className="relative group w-full max-w-xl">
-              <Search 
-                size={14} 
-                className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors ${
-                  search ? 'text-[var(--color-tg-orange)]' : 'text-[var(--color-text-dim)]'
-                }`} 
-              />
-              <input
-                type="text"
-                placeholder="Search teams or clients…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-9 pr-9 py-2 rounded-[8px] bg-[var(--color-surface-base)] border border-[var(--color-border)] text-[var(--color-text-primary)] text-[14px] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-tg-orange)] focus:ring-1 focus:ring-[var(--color-tg-orange)]/20 transition-all shadow-inner"
-              />
-              {search && (
+          {activeView === 'teams' ? (
+            <>
+              {/* Team Tasks: Refresh + timestamp */}
+              <div className="flex items-center gap-3 min-w-[200px]">
                 <button
-                  onClick={() => setSearch('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-[var(--color-surface-3)] text-[var(--color-text-dim)] hover:text-[var(--color-text-primary)] transition-colors"
-                  title="Clear search"
+                  onClick={() => loadAllData(true)}
+                  disabled={loadingGroups}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-[6px] bg-[var(--color-surface-3)] border border-[var(--color-border)] hover:border-[var(--color-border-light)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] text-[13px] font-medium transition-colors disabled:opacity-50 shadow-sm"
                 >
-                  <X size={14} />
+                  <RefreshCw size={14} className={loadingGroups ? 'animate-spin-fast' : ''} />
+                  <span>Refresh</span>
                 </button>
-              )}
-            </div>
-          </div>
+                {cachedAt && !loadingGroups && (
+                  <span className="text-[11px] text-[var(--color-text-dim)] font-medium tabular-nums whitespace-nowrap">
+                    Updated {cachedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
+              </div>
 
-          {/* Logic Box */}
-          <div className="flex items-center gap-2 min-w-[200px] justify-end">
-            <button
-              onClick={() => setShowCronModal(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-[6px] bg-[var(--color-surface-3)] border border-[var(--color-border)] hover:border-[var(--color-border-light)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] text-[13px] font-medium transition-colors shadow-sm relative"
-              title="Schedule settings"
-            >
-              <Clock size={14} />
-              <span>Schedule</span>
-              {config.cron && (
-                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[var(--color-tg-orange)] border-2 border-[var(--color-surface-2)] shadow-sm" />
-              )}
-            </button>
-            
-            <button
-              onClick={handleSendAll}
-              disabled={sendingAll || loadingGroups || activeWithChannel.length === 0}
-              className="flex items-center gap-2 px-4 py-1.5 rounded-[6px] bg-[var(--color-tg-orange)] hover:bg-[var(--color-tg-orange-hover)] text-white text-[13px] font-bold transition-all disabled:opacity-50 shadow-md shadow-[var(--color-tg-orange)]/20"
-            >
-              {sendingAll ? <Loader2 size={14} className="animate-spin-fast" /> : <Send size={14} />}
-              <span>
-                {sendingAll
-                  ? 'Sending…'
-                  : `Send Active${activeWithChannel.length > 0 ? ` (${activeWithChannel.length})` : ''}`}
-              </span>
-            </button>
-          </div>
+              {/* Team Tasks: Search */}
+              <div className="flex-1 flex justify-center max-w-2xl px-4 mx-auto">
+                <div className="relative group w-full max-w-xl">
+                  <Search
+                    size={14}
+                    className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors ${
+                      search ? 'text-[var(--color-tg-orange)]' : 'text-[var(--color-text-dim)]'
+                    }`}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Search teams or clients…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full pl-9 pr-9 py-2 rounded-[8px] bg-[var(--color-surface-base)] border border-[var(--color-border)] text-[var(--color-text-primary)] text-[14px] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-tg-orange)] focus:ring-1 focus:ring-[var(--color-tg-orange)]/20 transition-all shadow-inner"
+                  />
+                  {search && (
+                    <button
+                      onClick={() => setSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-[var(--color-surface-3)] text-[var(--color-text-dim)] hover:text-[var(--color-text-primary)] transition-colors"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Team Tasks: Schedule + Send Active */}
+              <div className="flex items-center gap-2 min-w-[200px] justify-end">
+                <button
+                  onClick={() => setShowCronModal(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-[6px] bg-[var(--color-surface-3)] border border-[var(--color-border)] hover:border-[var(--color-border-light)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] text-[13px] font-medium transition-colors shadow-sm relative"
+                  title="Schedule settings"
+                >
+                  <Clock size={14} />
+                  <span>Schedule</span>
+                  {config.cron && (
+                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[var(--color-tg-orange)] border-2 border-[var(--color-surface-2)] shadow-sm" />
+                  )}
+                </button>
+                <button
+                  onClick={handleSendAll}
+                  disabled={sendingAll || loadingGroups || activeWithChannel.length === 0}
+                  className="flex items-center gap-2 px-4 py-1.5 rounded-[6px] bg-[var(--color-tg-orange)] hover:bg-[var(--color-tg-orange-hover)] text-white text-[13px] font-bold transition-all disabled:opacity-50 shadow-md shadow-[var(--color-tg-orange)]/20"
+                >
+                  {sendingAll ? <Loader2 size={14} className="animate-spin-fast" /> : <Send size={14} />}
+                  <span>
+                    {sendingAll ? 'Sending…' : `Send Active${activeWithChannel.length > 0 ? ` (${activeWithChannel.length})` : ''}`}
+                  </span>
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Team Members: Refresh */}
+              <div className="flex items-center gap-3 min-w-[200px]">
+                <button
+                  onClick={() => setMembersRefreshKey((k) => k + 1)}
+                  disabled={membersStats.loading}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-[6px] bg-[var(--color-surface-3)] border border-[var(--color-border)] hover:border-[var(--color-border-light)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] text-[13px] font-medium transition-colors disabled:opacity-50 shadow-sm"
+                >
+                  <RefreshCw size={14} className={membersStats.loading ? 'animate-spin-fast' : ''} />
+                  <span>Refresh</span>
+                </button>
+              </div>
+
+              {/* Team Members: Search */}
+              <div className="flex-1 flex justify-center max-w-2xl px-4 mx-auto">
+                <div className="relative group w-full max-w-xl">
+                  <Search
+                    size={14}
+                    className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors ${
+                      membersSearch ? 'text-[var(--color-tg-orange)]' : 'text-[var(--color-text-dim)]'
+                    }`}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Search members…"
+                    value={membersSearch}
+                    onChange={(e) => setMembersSearch(e.target.value)}
+                    className="w-full pl-9 pr-9 py-2 rounded-[8px] bg-[var(--color-surface-base)] border border-[var(--color-border)] text-[var(--color-text-primary)] text-[14px] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-tg-orange)] focus:ring-1 focus:ring-[var(--color-tg-orange)]/20 transition-all shadow-inner"
+                  />
+                  {membersSearch && (
+                    <button
+                      onClick={() => setMembersSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-[var(--color-surface-3)] text-[var(--color-text-dim)] hover:text-[var(--color-text-primary)] transition-colors"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Team Members: Send Monday DMs */}
+              <div className="flex items-center gap-2 min-w-[200px] justify-end">
+                <button
+                  onClick={handleSendAllMembers}
+                  disabled={sendingAllMembers || membersStats.loading || membersStats.optedInCount === 0}
+                  className="flex items-center gap-2 px-4 py-1.5 rounded-[6px] bg-[var(--color-tg-orange)] hover:bg-[var(--color-tg-orange-hover)] text-white text-[13px] font-bold transition-all disabled:opacity-50 shadow-md shadow-[var(--color-tg-orange)]/20"
+                >
+                  {sendingAllMembers ? <Loader2 size={14} className="animate-spin-fast" /> : <Send size={14} />}
+                  <span>
+                    {sendingAllMembers
+                      ? 'Sending…'
+                      : `Send Monday DMs${membersStats.optedInCount > 0 ? ` (${membersStats.optedInCount})` : ''}`}
+                  </span>
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </header>
 
       {/* Main content */}
-      <main className="flex-1 overflow-hidden flex flex-col px-6 pt-6 pb-2 max-w-[1500px] mx-auto w-full">
+      {activeView === 'members' ? (
+        <MembersView
+          ref={membersViewRef}
+          config={config}
+          onConfigChange={saveConfig}
+          search={membersSearch}
+          refreshKey={membersRefreshKey}
+          onStatsChange={setMembersStats}
+        />
+      ) : (
+        <main className="flex-1 overflow-hidden flex flex-col px-6 pt-6 pb-2 max-w-[1500px] mx-auto w-full">
         {/* Error */}
         {error && (
           <div className="flex items-center gap-2 px-4 py-3 mb-5 rounded-[8px] bg-[var(--color-danger-dim)] border border-[var(--color-danger)]/25 text-[var(--color-danger)] text-[13px]">
@@ -516,7 +647,8 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
-      </main>
+        </main>
+      )}
 
       {/* Toasts */}
       <div className="fixed bottom-5 right-5 flex flex-col gap-2 z-50">

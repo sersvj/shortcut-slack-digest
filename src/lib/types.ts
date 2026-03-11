@@ -21,6 +21,7 @@ export interface ShortcutStory {
   app_url: string;
   deadline: string | null;
   owner_ids: string[];
+  requested_by_id: string;
   workflow_state_id: number;
   completed: boolean;
   archived: boolean;
@@ -57,6 +58,20 @@ export interface TeamConfig {
   lastSentAt: string | null;
 }
 
+export interface MemberConfig {
+  slackUserId: string;    // Slack user ID — used directly as chat.postMessage channel
+  slackUserName: string;  // Display name for the UI
+  optedIn: boolean;       // Opted in to automatic Monday digest
+  lastSentAt: string | null;
+}
+
+export interface MemberDigest {
+  id: string;
+  name: string;
+  owned: CategorizedStories;
+  requested: CategorizedStories;
+}
+
 export interface CronConfig {
   enabled: boolean;      // always false until manually activated in vercel.json
   hour: number;          // 0–23
@@ -67,6 +82,7 @@ export interface CronConfig {
 
 export interface AppConfig {
   mappings: Record<string, TeamConfig>;
+  memberMappings?: Record<string, MemberConfig>;
   cron?: CronConfig;
 }
 
