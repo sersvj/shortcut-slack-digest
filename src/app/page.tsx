@@ -301,7 +301,7 @@ export default function DashboardPage() {
             </svg>
             <div>
               <span className="text-[15px] font-bold tracking-tight text-[var(--color-text-primary)]">
-                T/G Daily Digest
+                T/G Task Digest
               </span>
               <span className="ml-2 text-[12px] text-[var(--color-text-dim)]">Shortcut × Slack</span>
             </div>

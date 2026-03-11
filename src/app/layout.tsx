@@ -3,7 +3,7 @@ import { SessionProvider } from 'next-auth/react';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'T/G Daily Digest — Shortcut × Slack',
+  title: 'T/G Task Digest — Shortcut × Slack',
   description: 'Send daily task digests from Shortcut to Slack channels',
 };
 

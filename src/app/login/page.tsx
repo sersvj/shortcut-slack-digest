@@ -27,7 +27,7 @@ export default function LoginPage() {
           </svg>
           <div>
             <h1 className="text-2xl font-bold text-[var(--color-text-primary)] tracking-tight">
-              T/G Daily Digest
+              T/G Task Digest
             </h1>
             <p className="text-[13px] text-[var(--color-text-muted)] mt-1">
               Shortcut × Slack

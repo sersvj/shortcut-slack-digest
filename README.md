@@ -1,6 +1,6 @@
-# T/G Daily Digest
+# T/G Task Digest
 
-Internal tool that pulls open tasks from Shortcut (by Team) and sends formatted daily digests to mapped Slack channels.
+Internal tool that pulls open tasks from Shortcut (by Team) and sends formatted task digests to mapped Slack channels.
 
 **Live:** `https://YOUR-APP.vercel.app`
 **Repo:** `https://github.com/YOUR-USERNAME/shortcut-slack-digest`

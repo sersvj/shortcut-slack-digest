@@ -57,7 +57,7 @@ export function buildSlackBlocks(
       type: 'header',
       text: {
         type: 'plain_text',
-        text: `${teamName} Daily Digest`,
+        text: `${teamName} Task Digest`,
         emoji: false,
       },
     },

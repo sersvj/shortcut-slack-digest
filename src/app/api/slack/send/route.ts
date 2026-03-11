@@ -84,7 +84,7 @@ export async function POST(request: Request) {
 
       await slack.chat.postMessage({
         channel: teamConfig.slackChannelId,
-        text: `${teamName} — Daily Digest`,
+        text: `${teamName} — Task Digest`,
         blocks: blocks as any,
         unfurl_links: false,
         unfurl_media: false,

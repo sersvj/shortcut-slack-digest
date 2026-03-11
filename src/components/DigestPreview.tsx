@@ -84,7 +84,7 @@ export function DigestPreview({ teamName, stories }: DigestPreviewProps) {
         <div className="digest-preview-area border-t border-[var(--color-border)] p-4 overflow-x-auto">
           <div className="flex items-baseline gap-3 mb-3 pb-3 border-b border-[var(--color-border)]">
             <span className="text-[13px] font-bold text-[var(--color-text-primary)]">
-              {teamName} — Daily Digest
+              {teamName} — Task Digest
             </span>
             <span className="text-[11px] text-[var(--color-text-dim)]">{today}</span>
           </div>
