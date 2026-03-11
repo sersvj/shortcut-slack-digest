@@ -26,15 +26,34 @@ export async function GET(request: Request) {
   const config = await readConfig();
   const slack = new WebClient(slackToken);
 
-  // Fetch member map for owner name resolution
-  const membersRes = await fetch(`${SHORTCUT_BASE}/members`, {
-    headers: { 'Content-Type': 'application/json', 'Shortcut-Token': scToken },
-    cache: 'no-store',
-  });
-  const members: any[] = membersRes.ok ? await membersRes.json() : [];
+  // Fetch member and workflow maps for resolution
+  const [membersRes, workflowsRes] = await Promise.all([
+    fetch(`${SHORTCUT_BASE}/members`, {
+      headers: { 'Content-Type': 'application/json', 'Shortcut-Token': scToken },
+      cache: 'no-store',
+    }),
+    fetch(`${SHORTCUT_BASE}/workflows`, {
+      headers: { 'Content-Type': 'application/json', 'Shortcut-Token': scToken },
+      cache: 'no-store',
+    }),
+  ]);
+
   const memberMap: Record<string, string> = {};
-  for (const m of members) {
-    if (!m.disabled) memberMap[m.id] = m.profile?.name || m.profile?.mention_name || m.id;
+  if (membersRes.ok) {
+    const members: any[] = await membersRes.json();
+    for (const m of members) {
+      if (!m.disabled) memberMap[m.id] = m.profile?.name || m.profile?.mention_name || m.id;
+    }
+  }
+
+  const stateMap: Record<number, string> = {};
+  if (workflowsRes.ok) {
+    const workflows: any[] = await workflowsRes.json();
+    for (const wf of workflows) {
+      for (const st of wf.states || []) {
+        stateMap[st.id] = st.name;
+      }
+    }
   }
 
   // Get all active teams with a mapped Slack channel
@@ -60,7 +79,7 @@ export async function GET(request: Request) {
       const stories: ShortcutStory[] = (await storiesRes.json()).filter(
         (s: ShortcutStory) => !s.completed
       );
-      const categorized = categorizeStories(stories, memberMap);
+      const categorized = categorizeStories(stories, memberMap, stateMap);
       const blocks = buildSlackBlocks(teamConfig.slackChannelName || teamId, categorized);
 
       await slack.chat.postMessage({

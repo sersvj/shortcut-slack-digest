@@ -12,8 +12,8 @@ export async function GET(
     return NextResponse.json({ error: 'Missing SHORTCUT_API_TOKEN' }, { status: 500 });
   }
 
-  // Fetch stories for this group
-  const [storiesRes, membersRes] = await Promise.all([
+  // Fetch stories, members, and workflows
+  const [storiesRes, membersRes, workflowsRes] = await Promise.all([
     fetch(`https://api.app.shortcut.com/api/v3/groups/${id}/stories`, {
       headers: {
         'Content-Type': 'application/json',
@@ -28,6 +28,13 @@ export async function GET(
       },
       cache: 'no-store',
     }),
+    fetch('https://api.app.shortcut.com/api/v3/workflows', {
+      headers: {
+        'Content-Type': 'application/json',
+        'Shortcut-Token': token,
+      },
+      cache: 'no-store',
+    }),
   ]);
 
   if (!storiesRes.ok) {
@@ -36,6 +43,7 @@ export async function GET(
 
   const stories: ShortcutStory[] = await storiesRes.json();
   let memberMap: Record<string, string> = {};
+  let stateMap: Record<number, string> = {};
 
   if (membersRes.ok) {
     const members: any[] = await membersRes.json();
@@ -46,9 +54,18 @@ export async function GET(
     }
   }
 
+  if (workflowsRes.ok) {
+    const workflows: any[] = await workflowsRes.json();
+    for (const wf of workflows) {
+      for (const st of wf.states || []) {
+        stateMap[st.id] = st.name;
+      }
+    }
+  }
+
   // Filter out completed stories
   const openStories = stories.filter((s) => !s.completed);
-  const categorized = categorizeStories(openStories, memberMap);
+  const categorized = categorizeStories(openStories, memberMap, stateMap);
 
   return NextResponse.json(categorized);
 }

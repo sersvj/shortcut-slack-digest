@@ -5,10 +5,11 @@ function storyLines(stories: CategorizedStory[]): string {
     .map((s) => {
       const owners =
         s.owners.length > 0 ? `_${s.owners.join(', ')}_` : '_Unassigned_';
+      const state = s.state ? `  ·  *${s.state}*` : '';
       const date = s.deadline
         ? `  ·  ${new Date(s.deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
         : '';
-      return `• <${s.app_url}|${s.name}>   ${owners}${date}`;
+      return `• <${s.app_url}|${s.name}>   ${owners}${state}${date}`;
     })
     .join('\n');
 }

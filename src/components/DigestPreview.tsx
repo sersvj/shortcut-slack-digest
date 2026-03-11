@@ -27,6 +27,7 @@ function StoryLine({ story }: { story: CategorizedStory }) {
       </a>
       <span className="text-[var(--color-text-dim)] text-[11px] shrink-0">
         — {story.owners.length > 0 ? story.owners.join(', ') : 'Unassigned'}
+        {story.state && ` [${story.state}]`}
         {deadline && ` (${deadline})`}
       </span>
     </div>

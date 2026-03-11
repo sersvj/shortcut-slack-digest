@@ -31,6 +31,22 @@ async function fetchMemberMap(scToken: string): Promise<Record<string, string>> 
   return map;
 }
 
+async function fetchWorkflowMap(scToken: string): Promise<Record<number, string>> {
+  const res = await fetch(`${SHORTCUT_BASE}/workflows`, {
+    headers: { 'Content-Type': 'application/json', 'Shortcut-Token': scToken },
+    cache: 'no-store',
+  });
+  if (!res.ok) return {};
+  const workflows: any[] = await res.json();
+  const map: Record<number, string> = {};
+  for (const wf of workflows) {
+    for (const st of wf.states || []) {
+      map[st.id] = st.name;
+    }
+  }
+  return map;
+}
+
 export async function POST(request: Request) {
   const scToken = process.env.SHORTCUT_API_TOKEN;
   const slackToken = process.env.SLACK_BOT_TOKEN;
@@ -45,7 +61,10 @@ export async function POST(request: Request) {
 
   const config = await readConfig();
   const slack = new WebClient(slackToken);
-  const memberMap = await fetchMemberMap(scToken);
+  const [memberMap, stateMap] = await Promise.all([
+    fetchMemberMap(scToken),
+    fetchWorkflowMap(scToken),
+  ]);
 
   const results: { teamId: string; success: boolean; error?: string; channel?: string }[] = [];
 
@@ -59,7 +78,7 @@ export async function POST(request: Request) {
 
     try {
       const stories = await fetchGroupStories(teamId, scToken);
-      const categorized = categorizeStories(stories, memberMap);
+      const categorized = categorizeStories(stories, memberMap, stateMap);
       const teamName = teamNames[teamId] || 'Unknown Team';
       const blocks = buildSlackBlocks(teamName, categorized);
 

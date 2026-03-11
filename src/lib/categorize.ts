@@ -12,7 +12,8 @@ endOfWeek.setHours(23, 59, 59, 999);
 
 export function categorizeStories(
   stories: ShortcutStory[],
-  memberMap: Record<string, string>
+  memberMap: Record<string, string>,
+  stateMap: Record<number, string> = {}
 ): CategorizedStories {
   const now = new Date();
   const todayStart = new Date(now);
@@ -47,6 +48,7 @@ export function categorizeStories(
       app_url: story.app_url,
       deadline: story.deadline,
       owners,
+      state: stateMap[story.workflow_state_id],
     };
 
     if (!story.deadline) {

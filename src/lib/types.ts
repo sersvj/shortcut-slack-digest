@@ -32,6 +32,7 @@ export interface CategorizedStory {
   app_url: string;
   deadline: string | null;
   owners: string[];
+  state?: string;
 }
 
 export interface CategorizedStories {
