@@ -7,7 +7,6 @@ import {
   Send,
   Loader2,
   AlertTriangle,
-  LayoutGrid,
   Inbox,
   Search,
   LogOut,
@@ -289,9 +288,7 @@ export default function DashboardPage() {
       {/* Header */}
       <header className="sticky top-0 z-50 flex items-center justify-between px-6 h-14 bg-[var(--color-surface-1)]/90 backdrop-blur-md border-b border-[var(--color-border)]">
         <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded-md bg-[var(--color-tg-orange)] flex items-center justify-center">
-            <LayoutGrid size={15} className="text-white" />
-          </div>
+            <img src="/icon-tg-cow.svg" alt="T/G" className="w-7 h-7" />
           <div>
             <span className="text-[15px] font-bold tracking-tight text-[var(--color-text-primary)]">
               T/G Daily Digest

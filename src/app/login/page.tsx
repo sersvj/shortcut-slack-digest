@@ -1,7 +1,6 @@
 'use client';
 
 import { signIn } from 'next-auth/react';
-import { MessageSquare } from 'lucide-react';
 
 export default function LoginPage() {
   return (
@@ -18,9 +17,7 @@ export default function LoginPage() {
       <div className="relative z-10 flex flex-col items-center gap-8 text-center px-6">
         {/* Logo */}
         <div className="flex flex-col items-center gap-3">
-          <div className="w-14 h-14 rounded-2xl bg-[var(--color-tg-orange)] flex items-center justify-center shadow-lg shadow-orange-900/30">
-            <MessageSquare size={28} className="text-white" />
-          </div>
+          <img src="/icon-tg-cow.svg" alt="T/G" className="w-14 h-14" />
           <div>
             <h1 className="text-2xl font-bold text-[var(--color-text-primary)] tracking-tight">
               T/G Daily Digest
