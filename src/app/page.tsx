@@ -11,9 +11,11 @@ import {
   Inbox,
   Search,
   LogOut,
+  Clock,
 } from 'lucide-react';
-import { ShortcutGroup, CategorizedStories, SlackChannel, AppConfig } from '@/lib/types';
+import { ShortcutGroup, CategorizedStories, SlackChannel, AppConfig, CronConfig } from '@/lib/types';
 import { ClientCard } from '@/components/ClientCard';
+import { CronSettingsModal } from '@/components/CronSettingsModal';
 
 interface Toast {
   id: number;
@@ -36,6 +38,7 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [cachedAt, setCachedAt] = useState<Date | null>(null);
+  const [showCronModal, setShowCronModal] = useState(false);
 
   const addToast = useCallback((type: 'success' | 'error', message: string) => {
     const id = ++toastId;
@@ -255,6 +258,20 @@ export default function DashboardPage() {
     [sendDigests]
   );
 
+  const handleSaveCron = useCallback(
+    async (cron: CronConfig) => {
+      const newConfig = { ...config, cron };
+      setConfig(newConfig);
+      await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newConfig),
+      });
+      addToast('success', 'Schedule settings saved');
+    },
+    [config, addToast]
+  );
+
   const q = search.trim().toLowerCase();
   const filtered = (arr: ShortcutGroup[]) =>
     q ? arr.filter((g) => g.name.toLowerCase().includes(q)) : arr;
@@ -295,6 +312,17 @@ export default function DashboardPage() {
               className="pl-8 pr-3 py-1.5 rounded-[6px] bg-[var(--color-surface-3)] border border-[var(--color-border)] text-[var(--color-text-primary)] text-[13px] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-tg-orange)] transition-colors w-48"
             />
           </div>
+          <button
+            onClick={() => setShowCronModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] bg-[var(--color-surface-3)] border border-[var(--color-border)] hover:border-[var(--color-border-light)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] text-[13px] font-medium transition-colors"
+            title="Schedule settings"
+          >
+            <Clock size={13} />
+            Schedule
+            {config.cron && (
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-tg-orange)]" />
+            )}
+          </button>
           <button
             onClick={() => loadAllData(true)}
             disabled={loadingGroups}
@@ -455,6 +483,15 @@ export default function DashboardPage() {
           </div>
         ))}
       </div>
+
+      {/* Cron Settings Modal */}
+      {showCronModal && (
+        <CronSettingsModal
+          config={config}
+          onClose={() => setShowCronModal(false)}
+          onSave={handleSaveCron}
+        />
+      )}
     </div>
   );
 }

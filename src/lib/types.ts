@@ -55,8 +55,17 @@ export interface TeamConfig {
   lastSentAt: string | null;
 }
 
+export interface CronConfig {
+  enabled: boolean;      // always false until manually activated in vercel.json
+  hour: number;          // 0–23
+  minute: number;        // 0 or 30
+  days: number[];        // 0=Sun, 1=Mon ... 6=Sat
+  timezone: string;      // e.g. "America/New_York"
+}
+
 export interface AppConfig {
   mappings: Record<string, TeamConfig>;
+  cron?: CronConfig;
 }
 
 export interface ClientCardData {
