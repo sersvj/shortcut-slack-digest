@@ -21,7 +21,7 @@ export async function GET() {
 
   const groups: ShortcutGroup[] = await res.json();
   // Filter out archived groups
-  const active = groups.filter((g: any) => !g.archived);
+  const active = groups.filter((g) => !g.archived);
 
   return NextResponse.json(active);
 }

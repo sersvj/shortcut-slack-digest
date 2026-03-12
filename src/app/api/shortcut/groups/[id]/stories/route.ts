@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { categorizeStories } from '@/lib/categorize';
-import { ShortcutStory } from '@/lib/types';
+import { ShortcutStory, ShortcutMember, ShortcutWorkflow } from '@/lib/types';
 
 export async function GET(
   request: Request,
@@ -42,11 +42,11 @@ export async function GET(
   }
 
   const stories: ShortcutStory[] = await storiesRes.json();
-  let memberMap: Record<string, string> = {};
-  let stateMap: Record<number, string> = {};
+  const memberMap: Record<string, string> = {};
+  const stateMap: Record<number, string> = {};
 
   if (membersRes.ok) {
-    const members: any[] = await membersRes.json();
+    const members = (await membersRes.json()) as ShortcutMember[];
     for (const m of members) {
       if (!m.disabled) {
         memberMap[m.id] = m.profile?.name || m.profile?.mention_name || m.id;
@@ -55,7 +55,7 @@ export async function GET(
   }
 
   if (workflowsRes.ok) {
-    const workflows: any[] = await workflowsRes.json();
+    const workflows = (await workflowsRes.json()) as ShortcutWorkflow[];
     for (const wf of workflows) {
       for (const st of wf.states || []) {
         stateMap[st.id] = st.name;

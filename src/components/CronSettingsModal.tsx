@@ -91,7 +91,7 @@ export function CronSettingsModal({ config, onClose, onSave }: Props) {
           <div className="flex items-start gap-2.5 px-4 py-3 rounded-[8px] bg-[var(--color-surface-3)] border border-[var(--color-border)]">
             <Info size={13} className="text-[var(--color-text-muted)] mt-0.5 shrink-0" />
             <p className="text-[12px] text-[var(--color-text-muted)] leading-relaxed">
-              Set your preferred schedule below and save. Once you're happy with it,
+              Set your preferred schedule below and save. Once you&apos;re happy with it,
               reach out to Stephen to flip the switch and get automatic digests running.
             </p>
           </div>

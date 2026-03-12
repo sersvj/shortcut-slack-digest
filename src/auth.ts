@@ -11,16 +11,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    async signIn({ account, profile }: any) {
+    async signIn({ account, profile }) {
       // Only allow users from the configured Slack workspace
       const teamId = account?.access_token
-        ? profile?.['https://slack.com/team_id'] ?? account?.team?.id
+        ? (profile as Record<string, unknown> | undefined)?.['https://slack.com/team_id'] ?? (account as { team?: { id: string } })?.team?.id
         : null;
 
       // Check workspace via the team field returned in the token/profile
       const workspaceId =
-        profile?.['https://slack.com/team_id'] ||
-        (account as any)?.team_id ||
+        (profile as Record<string, unknown> | undefined)?.['https://slack.com/team_id'] ||
+        (account as { team_id?: string })?.team_id ||
         teamId;
 
       if (ALLOWED_WORKSPACE && workspaceId && workspaceId !== ALLOWED_WORKSPACE) {
@@ -28,9 +28,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       return true;
     },
-    async session({ session, token }: any) {
+    async session({ session, token }) {
       if (session.user && token.picture) {
-        session.user.image = token.picture;
+        session.user.image = token.picture as string;
       }
       return session;
     },

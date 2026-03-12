@@ -32,7 +32,10 @@ export async function GET() {
 
     channels.sort((a, b) => a.name.localeCompare(b.name));
     return NextResponse.json(channels);
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Slack API error' }, { status: 502 });
+  } catch (err: unknown) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Slack API error' },
+      { status: 502 }
+    );
   }
 }

@@ -1,5 +1,5 @@
 import { categorizeStories } from './categorize';
-import { MemberDigest, ShortcutStory } from './types';
+import { MemberDigest, ShortcutStory, ShortcutMember, ShortcutWorkflow, ShortcutGroup } from './types';
 
 const BASE = 'https://api.app.shortcut.com/api/v3';
 
@@ -21,7 +21,7 @@ export async function getMemberDigests(scToken: string): Promise<MemberDigest[]>
 
   const memberMap: Record<string, string> = {};
   if (membersRes.ok) {
-    const members: any[] = await membersRes.json();
+    const members = (await membersRes.json()) as ShortcutMember[];
     for (const m of members) {
       if (!m.disabled) {
         memberMap[m.id] = m.profile?.name || m.profile?.mention_name || m.id;
@@ -31,7 +31,7 @@ export async function getMemberDigests(scToken: string): Promise<MemberDigest[]>
 
   const stateMap: Record<number, string> = {};
   if (workflowsRes.ok) {
-    const workflows: any[] = await workflowsRes.json();
+    const workflows = (await workflowsRes.json()) as ShortcutWorkflow[];
     for (const wf of workflows) {
       for (const st of wf.states || []) {
         stateMap[st.id] = st.name;
@@ -39,7 +39,7 @@ export async function getMemberDigests(scToken: string): Promise<MemberDigest[]>
     }
   }
 
-  const groups: any[] = await groupsRes.json();
+  const groups = (await groupsRes.json()) as ShortcutGroup[];
   const activeGroups = groups.filter((g) => !g.archived);
 
   const storyArrays = await Promise.all(

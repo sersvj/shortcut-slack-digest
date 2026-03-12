@@ -92,6 +92,7 @@ function TabPanel({
     <>
       <button
         onClick={() => setIsOpen(!isOpen)}
+        suppressHydrationWarning
         className="w-full flex items-center gap-2 px-4 py-2.5 border-t border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors text-[12px] font-medium"
       >
         <span>Task Digest</span>
@@ -110,6 +111,7 @@ function TabPanel({
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
+                  suppressHydrationWarning
                   className={`px-4 py-2 text-[12px] font-medium transition-colors border-b-2 ${
                     activeTab === tab.key
                       ? 'border-[var(--color-tg-orange)] text-[var(--color-tg-orange)]'
@@ -189,6 +191,7 @@ export function MemberCard({
         {config?.slackUserId && (
           <button
             onClick={handleSend}
+            suppressHydrationWarning
             disabled={sending}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] bg-[var(--color-tg-orange)] hover:bg-[var(--color-tg-orange-hover)] text-white text-[12px] font-medium transition-colors disabled:opacity-50"
           >
@@ -209,6 +212,7 @@ export function MemberCard({
         <select
           className="w-full sm:flex-1 bg-[var(--color-surface-3)] border border-[var(--color-border)] text-[var(--color-text-primary)] text-[12px] px-2.5 py-1.5 rounded-[6px] cursor-pointer focus:outline-none focus:border-[var(--color-tg-orange)] transition-colors"
           value={config?.slackUserId || ''}
+          suppressHydrationWarning
           onChange={(e) => {
             const selected = slackUsers.find((u) => u.id === e.target.value);
             onConfigChange(digest.id, {
@@ -231,6 +235,7 @@ export function MemberCard({
         <label className="flex items-center gap-2 cursor-pointer group select-none">
           <div
             onClick={() => onConfigChange(digest.id, { optedIn: !config?.optedIn })}
+            suppressHydrationWarning
             className={`relative w-8 h-4.5 rounded-full transition-colors ${
               config?.optedIn ? 'bg-[var(--color-tg-orange)]' : 'bg-[var(--color-surface-3)] border border-[var(--color-border)]'
             }`}
@@ -250,7 +255,7 @@ export function MemberCard({
         </label>
 
         {config?.lastSentAt && (
-          <span className="ml-auto text-[11px] text-[var(--color-text-dim)]">
+          <span className="ml-auto text-[11px] text-[var(--color-text-dim)]" suppressHydrationWarning>
             Sent {timeSince(config.lastSentAt)}
           </span>
         )}

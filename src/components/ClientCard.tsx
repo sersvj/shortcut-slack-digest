@@ -24,7 +24,7 @@ interface ClientCardProps {
   isActive: boolean;
   onToggleActive: (groupId: string, active: boolean) => void;
   onChannelChange: (groupId: string, channelId: string, channelName: string) => void;
-  onSendSingle: (groupId: string, groupName: string) => Promise<void>;
+  onSendSingle: (groupId: string) => Promise<void>;
 }
 
 function timeSince(isoDate: string): string {
@@ -58,7 +58,7 @@ export function ClientCard({
     setSending(true);
     setSentSuccess(false);
     try {
-      await onSendSingle(group.id, group.name);
+      await onSendSingle(group.id);
       setSentSuccess(true);
       setTimeout(() => setSentSuccess(false), 4000);
     } finally {
@@ -108,6 +108,7 @@ export function ClientCard({
         {hasChannel && (
           <button
             onClick={handleSend}
+            suppressHydrationWarning
             disabled={sending}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] bg-[var(--color-tg-orange)] hover:bg-[var(--color-tg-orange-hover)] text-white text-[12px] font-medium transition-colors disabled:opacity-50"
           >
@@ -156,6 +157,7 @@ export function ClientCard({
         <select
           className="w-full sm:flex-1 bg-[var(--color-surface-3)] border border-[var(--color-border)] text-[var(--color-text-primary)] text-[12px] px-2.5 py-1.5 rounded-[6px] cursor-pointer focus:outline-none focus:border-[var(--color-tg-orange)] transition-colors"
           value={config?.slackChannelId || ''}
+          suppressHydrationWarning
           onChange={(e) => {
             const selected = slackChannels.find((c) => c.id === e.target.value);
             onChannelChange(group.id, e.target.value, selected?.name || '');
@@ -177,6 +179,7 @@ export function ClientCard({
       <div className="flex items-center gap-2 px-4 py-2.5 border-t border-[var(--color-border)] bg-black/10">
         <button
           onClick={() => onToggleActive(group.id, !isActive)}
+          suppressHydrationWarning
           className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
         >
           {isActive ? (
@@ -191,7 +194,7 @@ export function ClientCard({
           )}
         </button>
         {config?.lastSentAt && (
-          <span className="ml-auto text-[11px] text-[var(--color-text-dim)]">
+          <span className="ml-auto text-[11px] text-[var(--color-text-dim)]" suppressHydrationWarning>
             Sent {timeSince(config.lastSentAt)}
           </span>
         )}

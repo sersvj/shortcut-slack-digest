@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import Image from 'next/image';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -21,6 +22,7 @@ import { ShortcutGroup, CategorizedStories, SlackChannel, AppConfig, CronConfig 
 import { ClientCard } from '@/components/ClientCard';
 import { CronSettingsModal } from '@/components/CronSettingsModal';
 import { MembersView, MembersViewHandle } from '@/components/MembersView';
+import { SummaryReportView } from '@/components/SummaryReportView';
 
 interface Toast {
   id: number;
@@ -78,11 +80,16 @@ function DashboardInner() {
   // ---- URL-based view routing ----
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [activeView, setActiveView] = useState<'teams' | 'members'>(
-    () => (searchParams.get('view') === 'members' ? 'members' : 'teams')
-  );
+  const [activeView, setActiveView] = useState<'teams' | 'members' | 'summary'>('teams');
 
-  const switchView = useCallback((view: 'teams' | 'members') => {
+  useEffect(() => {
+    const v = searchParams.get('view');
+    if (v === 'members') setActiveView('members');
+    else if (v === 'summary') setActiveView('summary');
+    else setActiveView('teams');
+  }, [searchParams]);
+
+  const switchView = useCallback((view: 'teams' | 'members' | 'summary') => {
     setActiveView(view);
     const params = new URLSearchParams(Array.from(searchParams.entries()));
     params.set('view', view);
@@ -91,6 +98,7 @@ function DashboardInner() {
 
   // ---- Members view state (lifted for header bar) ----
   const membersViewRef = useRef<MembersViewHandle>(null);
+  const [summarySearch, setSummarySearch] = useState('');
   const [membersSearch, setMembersSearch] = useState('');
   const [membersRefreshKey, setMembersRefreshKey] = useState(0);
   const [membersStats, setMembersStats] = useState({ loading: true, optedInCount: 0, total: 0 });
@@ -111,23 +119,6 @@ function DashboardInner() {
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4500);
   }, []);
 
-  const fetchStoriesForGroup = useCallback(async (groupId: string) => {
-    setLoadingStoriesFor((prev) => new Set([...prev, groupId]));
-    try {
-      const res = await fetch(`/api/shortcut/groups/${groupId}/stories`);
-      if (!res.ok) throw new Error('Failed');
-      const data: CategorizedStories = await res.json();
-      setStoriesMap((prev) => ({ ...prev, [groupId]: data }));
-    } catch {
-      // silently fail per-card
-    } finally {
-      setLoadingStoriesFor((prev) => {
-        const next = new Set(prev);
-        next.delete(groupId);
-        return next;
-      });
-    }
-  }, []);
 
   const CACHE_KEY = 'tg-digest-cache';
 
@@ -220,8 +211,8 @@ function DashboardInner() {
       setStoriesMap(freshStoriesMap);
       writeCache(groupsData, freshStoriesMap);
       setCachedAt(new Date());
-    } catch (err: any) {
-      setError(err.message || 'Failed to load data');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load teams');
     } finally {
       setLoadingGroups(false);
     }
@@ -292,8 +283,8 @@ function DashboardInner() {
       }
       setConfig({ ...config, mappings: newMappings });
 
-      const successCount = data.results?.filter((r: any) => r.success).length || 0;
-      const failCount = data.results?.filter((r: any) => !r.success).length || 0;
+      const successCount = data.results?.filter((r: { success: boolean }) => r.success).length ?? 0;
+    const failCount = data.results?.filter((r: { success: boolean }) => !r.success).length ?? 0;
       if (successCount > 0) addToast('success', `${successCount} digest${successCount > 1 ? 's' : ''} sent to Slack`);
       if (failCount > 0) addToast('error', `${failCount} digest${failCount > 1 ? 's' : ''} failed to send`);
     },
@@ -317,7 +308,7 @@ function DashboardInner() {
   }, [groups, config, sendDigests, addToast]);
 
   const handleSendSingle = useCallback(
-    async (groupId: string, groupName: string) => {
+    async (groupId: string) => {
       await sendDigests([groupId]);
     },
     [sendDigests]
@@ -376,6 +367,7 @@ function DashboardInner() {
             <div className="flex items-center gap-1 overflow-x-auto no-scrollbar scroll-smooth">
               <button
                 onClick={() => switchView('teams')}
+                suppressHydrationWarning
                 className={`px-3 py-1.5 rounded-[6px] text-[13px] font-medium transition-colors whitespace-nowrap ${
                   activeView === 'teams'
                     ? 'bg-[var(--color-tg-orange)]/15 text-[var(--color-tg-orange)]'
@@ -386,6 +378,7 @@ function DashboardInner() {
               </button>
               <button
                 onClick={() => switchView('members')}
+                suppressHydrationWarning
                 className={`px-3 py-1.5 rounded-[6px] text-[13px] font-medium transition-colors whitespace-nowrap ${
                   activeView === 'members'
                     ? 'bg-[var(--color-tg-orange)]/15 text-[var(--color-tg-orange)]'
@@ -393,6 +386,17 @@ function DashboardInner() {
                 }`}
               >
                 Team Members
+              </button>
+              <button
+                onClick={() => switchView('summary')}
+                suppressHydrationWarning
+                className={`px-3 py-1.5 rounded-[6px] text-[13px] font-medium transition-colors whitespace-nowrap ${
+                  activeView === 'summary'
+                    ? 'bg-[var(--color-tg-orange)]/15 text-[var(--color-tg-orange)]'
+                    : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-3)]'
+                }`}
+              >
+                Summary Report
               </button>
             </div>
           </div>
@@ -404,10 +408,12 @@ function DashboardInner() {
                   {session.user.name}
                 </span>
                 {session.user.image ? (
-                  <img
+                  <Image
                     src={session.user.image}
                     alt={session.user.name || 'User'}
-                    className="w-8 h-8 rounded-full border border-[var(--color-border)] shadow-sm"
+                    width={32}
+                    height={32}
+                    className="rounded-full border border-[var(--color-border)] shadow-sm"
                   />
                 ) : (
                   <div className="w-8 h-8 rounded-full bg-[var(--color-surface-3)] flex items-center justify-center text-[12px] font-bold text-[var(--color-text-muted)] border border-[var(--color-border)]">
@@ -430,12 +436,40 @@ function DashboardInner() {
         {/* Contextual Action Bar */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between px-4 sm:px-6 py-3 lg:h-14 bg-[var(--color-surface-2)]/80 border-b border-[var(--color-border)]/50 gap-4 lg:gap-6">
 
-          {activeView === 'teams' ? (
+          {activeView === 'summary' ? (
+            <div className="flex-1 flex justify-center w-full">
+              <div className="relative group w-full max-w-xl">
+                <Search
+                  size={14}
+                  className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors ${
+                    summarySearch ? 'text-[var(--color-tg-orange)]' : 'text-[var(--color-text-dim)]'
+                  }`}
+                />
+                <input
+                  type="text"
+                  placeholder="Filter active teams…"
+                  value={summarySearch}
+                  onChange={(e) => setSummarySearch(e.target.value)}
+                  suppressHydrationWarning
+                  className="w-full pl-9 pr-9 py-2 rounded-[8px] bg-[var(--color-surface-base)] border border-[var(--color-border)] text-[var(--color-text-primary)] text-[14px] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-tg-orange)] focus:ring-1 focus:ring-[var(--color-tg-orange)]/20 transition-all shadow-inner"
+                />
+                {summarySearch && (
+                  <button
+                    onClick={() => setSummarySearch('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-[var(--color-surface-3)] text-[var(--color-text-dim)] hover:text-[var(--color-text-primary)] transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : activeView === 'teams' ? (
             <>
               {/* Team Tasks: Refresh + timestamp */}
               <div className="flex items-center gap-3 order-2 lg:order-1 lg:min-w-[200px]">
                 <button
                   onClick={() => loadAllData(true)}
+                  suppressHydrationWarning
                   disabled={loadingGroups}
                   className="flex items-center gap-2 px-3 py-1.5 rounded-[6px] bg-[var(--color-surface-3)] border border-[var(--color-border)] hover:border-[var(--color-border-light)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] text-[13px] font-medium transition-colors disabled:opacity-50 shadow-sm"
                 >
@@ -443,7 +477,7 @@ function DashboardInner() {
                   <span className="hidden xs:inline">Refresh</span>
                 </button>
                 {cachedAt && !loadingGroups && (
-                  <span className="text-[11px] text-[var(--color-text-dim)] font-medium tabular-nums whitespace-nowrap">
+                  <span className="text-[11px] text-[var(--color-text-dim)] font-medium tabular-nums whitespace-nowrap" suppressHydrationWarning>
                     Updated {cachedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 )}
@@ -463,6 +497,7 @@ function DashboardInner() {
                     placeholder="Search teams or clients…"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
+                    suppressHydrationWarning
                     className="w-full pl-9 pr-9 py-2 rounded-[8px] bg-[var(--color-surface-base)] border border-[var(--color-border)] text-[var(--color-text-primary)] text-[14px] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-tg-orange)] focus:ring-1 focus:ring-[var(--color-tg-orange)]/20 transition-all shadow-inner"
                   />
                   {search && (
@@ -480,6 +515,7 @@ function DashboardInner() {
               <div className="flex items-center gap-2 order-3 lg:order-3 lg:min-w-[200px] lg:justify-end">
                 <button
                   onClick={() => setShowCronModal(true)}
+                  suppressHydrationWarning
                   className="flex items-center gap-2 px-3 py-1.5 rounded-[6px] bg-[var(--color-surface-3)] border border-[var(--color-border)] hover:border-[var(--color-border-light)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] text-[13px] font-medium transition-colors shadow-sm relative flex-1 sm:flex-none justify-center"
                   title="Schedule settings"
                 >
@@ -507,6 +543,7 @@ function DashboardInner() {
               <div className="flex items-center gap-3 order-2 lg:order-1 lg:min-w-[200px]">
                 <button
                   onClick={() => setMembersRefreshKey((k) => k + 1)}
+                  suppressHydrationWarning
                   disabled={membersStats.loading}
                   className="flex items-center gap-2 px-3 py-1.5 rounded-[6px] bg-[var(--color-surface-3)] border border-[var(--color-border)] hover:border-[var(--color-border-light)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] text-[13px] font-medium transition-colors disabled:opacity-50 shadow-sm"
                 >
@@ -563,7 +600,14 @@ function DashboardInner() {
       </header>
 
       {/* Main content */}
-      {activeView === 'members' ? (
+      {activeView === 'summary' ? (
+        <SummaryReportView
+          groups={groups}
+          config={config}
+          storiesMap={storiesMap}
+          search={summarySearch}
+        />
+      ) : activeView === 'members' ? (
         <MembersView
           ref={membersViewRef}
           config={config}

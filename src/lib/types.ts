@@ -7,12 +7,29 @@ export interface ShortcutGroup {
   num_stories: number;
   color: string;
   description: string;
+  archived: boolean;
 }
 
 export interface ShortcutMember {
   id: string;
+  disabled: boolean;
+  archived: boolean;
+  profile: {
+    name: string;
+    mention_name: string;
+  };
+}
+
+export interface ShortcutWorkflowState {
+  id: number;
   name: string;
-  mention_name: string;
+  type: string;
+}
+
+export interface ShortcutWorkflow {
+  id: number;
+  name: string;
+  states: ShortcutWorkflowState[];
 }
 
 export interface ShortcutStory {
@@ -90,4 +107,9 @@ export interface ClientCardData {
   group: ShortcutGroup;
   config: TeamConfig | null;
   stories: CategorizedStories | null;
+}
+
+export interface SlackUser {
+  id: string;
+  name: string;
 }

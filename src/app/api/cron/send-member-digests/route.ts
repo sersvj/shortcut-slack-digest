@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { WebClient } from '@slack/web-api';
+import { WebClient, Block, KnownBlock } from '@slack/web-api';
 import { readConfig, writeConfig } from '@/lib/config';
 import { getMemberDigests } from '@/lib/memberDigests';
 import { buildMemberSlackBlocks } from '@/lib/slack/memberFormatter';
@@ -49,7 +49,7 @@ export async function GET(request: Request) {
       await slack.chat.postMessage({
         channel: memberConfig.slackUserId,
         text: `${digest.name} — Personal Task Digest`,
-        blocks: blocks as any,
+        blocks: blocks as (Block | KnownBlock)[],
         unfurl_links: false,
         unfurl_media: false,
       });
@@ -60,8 +60,8 @@ export async function GET(request: Request) {
       };
 
       results.push({ memberId, success: true });
-    } catch (err: any) {
-      results.push({ memberId, success: false, error: err.message });
+    } catch (err: unknown) {
+      results.push({ memberId, success: false, error: err instanceof Error ? err.message : 'Unknown error' });
     }
   }
 

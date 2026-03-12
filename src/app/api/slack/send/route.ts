@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { WebClient } from '@slack/web-api';
+import { WebClient, Block, KnownBlock } from '@slack/web-api';
 import { readConfig, writeConfig } from '@/lib/config';
 import { buildSlackBlocks } from '@/lib/slack/formatter';
 import { categorizeStories } from '@/lib/categorize';
-import { ShortcutStory } from '@/lib/types';
+import { ShortcutStory, ShortcutMember, ShortcutWorkflow } from '@/lib/types';
 
 const SHORTCUT_BASE = 'https://api.app.shortcut.com/api/v3';
 
@@ -23,7 +23,7 @@ async function fetchMemberMap(scToken: string): Promise<Record<string, string>> 
     cache: 'no-store',
   });
   if (!res.ok) return {};
-  const members: any[] = await res.json();
+  const members = (await res.json()) as ShortcutMember[];
   const map: Record<string, string> = {};
   for (const m of members) {
     if (!m.disabled) map[m.id] = m.profile?.name || m.profile?.mention_name || m.id;
@@ -37,7 +37,7 @@ async function fetchWorkflowMap(scToken: string): Promise<Record<number, string>
     cache: 'no-store',
   });
   if (!res.ok) return {};
-  const workflows: any[] = await res.json();
+  const workflows = (await res.json()) as ShortcutWorkflow[];
   const map: Record<number, string> = {};
   for (const wf of workflows) {
     for (const st of wf.states || []) {
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
       await slack.chat.postMessage({
         channel: teamConfig.slackChannelId,
         text: `${teamName} — Task Digest`,
-        blocks: blocks as any,
+        blocks: blocks as (Block | KnownBlock)[],
         unfurl_links: false,
         unfurl_media: false,
       });
@@ -97,8 +97,8 @@ export async function POST(request: Request) {
       };
 
       results.push({ teamId, success: true, channel: teamConfig.slackChannelName });
-    } catch (err: any) {
-      results.push({ teamId, success: false, error: err.message || 'Unknown error' });
+    } catch (err: unknown) {
+      results.push({ teamId, success: false, error: err instanceof Error ? err.message : 'Unknown error' });
     }
   }
 

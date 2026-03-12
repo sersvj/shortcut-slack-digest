@@ -21,11 +21,11 @@ export async function GET() {
     return NextResponse.json({ error: data.error || 'Slack API error' }, { status: 502 });
   }
 
-  const users = (data.members as any[])
+  const users = ((data.members || []) as { id: string; real_name?: string; name?: string; is_bot?: boolean; deleted?: boolean }[])
     .filter((m) => !m.is_bot && !m.deleted && m.id !== 'USLACKBOT')
     .map((m) => ({
-      id: m.id as string,
-      name: (m.real_name || m.name) as string,
+      id: m.id,
+      name: m.real_name || m.name || m.id,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 

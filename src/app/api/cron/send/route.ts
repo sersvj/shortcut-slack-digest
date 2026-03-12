@@ -3,7 +3,8 @@ import { WebClient } from '@slack/web-api';
 import { readConfig } from '@/lib/config';
 import { buildSlackBlocks } from '@/lib/slack/formatter';
 import { categorizeStories } from '@/lib/categorize';
-import { ShortcutStory } from '@/lib/types';
+import { ShortcutStory, ShortcutMember, ShortcutWorkflow } from '@/lib/types';
+import { Block, KnownBlock } from '@slack/web-api';
 
 // Secret to verify the request is from Vercel Cron (not a public caller)
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -40,7 +41,7 @@ export async function GET(request: Request) {
 
   const memberMap: Record<string, string> = {};
   if (membersRes.ok) {
-    const members: any[] = await membersRes.json();
+    const members = (await membersRes.json()) as ShortcutMember[];
     for (const m of members) {
       if (!m.disabled) memberMap[m.id] = m.profile?.name || m.profile?.mention_name || m.id;
     }
@@ -48,7 +49,7 @@ export async function GET(request: Request) {
 
   const stateMap: Record<number, string> = {};
   if (workflowsRes.ok) {
-    const workflows: any[] = await workflowsRes.json();
+    const workflows = (await workflowsRes.json()) as ShortcutWorkflow[];
     for (const wf of workflows) {
       for (const st of wf.states || []) {
         stateMap[st.id] = st.name;
@@ -85,14 +86,14 @@ export async function GET(request: Request) {
       await slack.chat.postMessage({
         channel: teamConfig.slackChannelId,
         text: `${teamConfig.slackChannelName || teamId} — Task Digest`,
-        blocks: blocks as any,
+        blocks: blocks as (Block | KnownBlock)[],
         unfurl_links: false,
         unfurl_media: false,
       });
 
       results.push({ teamId, success: true });
-    } catch (err: any) {
-      results.push({ teamId, success: false, error: err.message });
+    } catch (err: unknown) {
+      results.push({ teamId, success: false, error: err instanceof Error ? err.message : 'Unknown error' });
     }
   }
 

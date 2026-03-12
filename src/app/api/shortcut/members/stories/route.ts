@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { categorizeStories } from '@/lib/categorize';
-import { MemberDigest, ShortcutStory } from '@/lib/types';
+import { MemberDigest, ShortcutStory, ShortcutMember, ShortcutWorkflow, ShortcutGroup } from '@/lib/types';
 
 const BASE = 'https://api.app.shortcut.com/api/v3';
 
@@ -26,7 +26,7 @@ export async function GET() {
   // Build member map (id -> name)
   const memberMap: Record<string, string> = {};
   if (membersRes.ok) {
-    const members: any[] = await membersRes.json();
+    const members = (await membersRes.json()) as ShortcutMember[];
     for (const m of members) {
       if (!m.disabled) {
         memberMap[m.id] = m.profile?.name || m.profile?.mention_name || m.id;
@@ -37,7 +37,7 @@ export async function GET() {
   // Build workflow state map
   const stateMap: Record<number, string> = {};
   if (workflowsRes.ok) {
-    const workflows: any[] = await workflowsRes.json();
+    const workflows = (await workflowsRes.json()) as ShortcutWorkflow[];
     for (const wf of workflows) {
       for (const st of wf.states || []) {
         stateMap[st.id] = st.name;
@@ -46,7 +46,7 @@ export async function GET() {
   }
 
   // Fetch all stories across all groups in parallel
-  const groups: any[] = await groupsRes.json();
+  const groups = (await groupsRes.json()) as ShortcutGroup[];
   const activeGroups = groups.filter((g) => !g.archived);
 
   const storyArrays = await Promise.all(

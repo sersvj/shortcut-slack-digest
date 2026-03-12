@@ -19,7 +19,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Shortcut API error' }, { status: 502 });
   }
 
-  const members: any[] = await res.json();
+  const members = (await res.json()) as ShortcutMember[];
 
   // Return a flat map: { id -> display name }
   const memberMap: Record<string, string> = {};

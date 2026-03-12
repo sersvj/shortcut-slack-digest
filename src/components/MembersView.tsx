@@ -2,13 +2,8 @@
 
 import { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { AlertTriangle, Send, Users } from 'lucide-react';
-import { MemberDigest, MemberConfig, AppConfig } from '@/lib/types';
+import { MemberDigest, MemberConfig, AppConfig, SlackUser } from '@/lib/types';
 import { MemberCard } from './MemberCard';
-
-interface SlackUser {
-  id: string;
-  name: string;
-}
 
 export interface MembersViewHandle {
   sendAll: () => Promise<void>;
@@ -51,8 +46,8 @@ export const MembersView = forwardRef<MembersViewHandle, MembersViewProps>(funct
       if (!digestsRes.ok) throw new Error('Failed to load member digests');
       setDigests(await digestsRes.json());
       if (usersRes.ok) setSlackUsers(await usersRes.json());
-    } catch (err: any) {
-      setError(err.message || 'Failed to load data');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load data');
     } finally {
       setLoading(false);
     }
@@ -123,8 +118,8 @@ export const MembersView = forwardRef<MembersViewHandle, MembersViewProps>(funct
       body: JSON.stringify({ memberIds: optedInIds }),
     });
     const data = await res.json();
-    const successCount = data.results?.filter((r: any) => r.success).length ?? 0;
-    const failCount = data.results?.filter((r: any) => !r.success).length ?? 0;
+    const successCount = data.results?.filter((r: { success: boolean }) => r.success).length ?? 0;
+    const failCount = data.results?.filter((r: { success: boolean }) => !r.success).length ?? 0;
     if (successCount > 0) showToast('success', `${successCount} DM${successCount > 1 ? 's' : ''} sent`);
     if (failCount > 0) showToast('error', `${failCount} DM${failCount > 1 ? 's' : ''} failed`);
   }, [config, showToast]);
