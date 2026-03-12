@@ -141,8 +141,16 @@ export const MembersView = forwardRef<MembersViewHandle, MembersViewProps>(funct
     0
   );
 
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   return (
-    <main className="flex-1 overflow-hidden flex flex-col px-6 pt-6 pb-2 max-w-[900px] mx-auto w-full">
+    <main className={`flex-1 ${isMobile ? '' : 'overflow-hidden'} flex flex-col px-4 sm:px-6 pt-4 sm:pt-6 pb-2 max-w-[900px] mx-auto w-full`}>
       {/* Error */}
       {error && (
         <div className="flex items-center gap-2 px-4 py-3 mb-5 rounded-[8px] bg-[var(--color-danger-dim)] border border-[var(--color-danger)]/25 text-[var(--color-danger)] text-[13px]">
@@ -153,7 +161,7 @@ export const MembersView = forwardRef<MembersViewHandle, MembersViewProps>(funct
 
       {/* Summary bar */}
       {!loading && (
-        <div className="flex items-center gap-5 mb-6 px-5 py-3.5 bg-[var(--color-surface-1)] border border-[var(--color-border)] rounded-[10px]">
+        <div className="flex flex-wrap items-center gap-x-8 gap-y-4 mb-6 px-5 py-4 bg-[var(--color-surface-1)] border border-[var(--color-border)] rounded-[10px] shadow-sm">
           <StatItem value={digests.length} label="Members" />
           <DividerBar />
           <StatItem value={totalOpen} label="Open Stories" />
@@ -165,7 +173,7 @@ export const MembersView = forwardRef<MembersViewHandle, MembersViewProps>(funct
       )}
 
       {/* Cards */}
-      <div className="flex-1 min-h-0 overflow-y-auto pr-3 pb-8 custom-scrollbar">
+      <div className={`flex-1 min-h-0 ${isMobile ? '' : 'overflow-y-auto pr-3'} pb-8 custom-scrollbar`}>
         {loading ? (
           <div className="flex flex-col gap-4">
             {[1, 2, 3, 4].map((i) => (

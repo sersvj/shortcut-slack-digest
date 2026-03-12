@@ -149,12 +149,12 @@ export function ClientCard({
       )}
 
       {/* Channel Selector */}
-      <div className="flex items-center gap-2 px-4 pb-3">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-4 pb-3">
         <span className="text-[11px] text-[var(--color-text-dim)] shrink-0 font-medium uppercase tracking-wide">
           Channel
         </span>
         <select
-          className="flex-1 bg-[var(--color-surface-3)] border border-[var(--color-border)] text-[var(--color-text-primary)] text-[12px] px-2.5 py-1.5 rounded-[6px] cursor-pointer focus:outline-none focus:border-[var(--color-tg-orange)] transition-colors"
+          className="w-full sm:flex-1 bg-[var(--color-surface-3)] border border-[var(--color-border)] text-[var(--color-text-primary)] text-[12px] px-2.5 py-1.5 rounded-[6px] cursor-pointer focus:outline-none focus:border-[var(--color-tg-orange)] transition-colors"
           value={config?.slackChannelId || ''}
           onChange={(e) => {
             const selected = slackChannels.find((c) => c.id === e.target.value);
