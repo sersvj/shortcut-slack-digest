@@ -144,7 +144,7 @@ function DashboardInner() {
   }, []);
 
 
-  const CACHE_KEY = 'tg-digest-cache';
+  const CACHE_KEY = 'tg-digest-cache-v2';
 
   const readCache = useCallback(() => {
     try {

@@ -193,8 +193,12 @@ function TeamAccordion({ group, stories }: { group: ShortcutGroup; stories?: Cat
 
   if (!stories) return null;
 
-  // Flatten all stories in canonical bucket order, preserving bucket annotation
-  const flatStories: CategorizedStory[] = BUCKET_ORDER.flatMap((bucket) => stories[bucket]);
+  // Flatten all stories in canonical bucket order.
+  // Use the array key as a fallback for `bucket` so cached stories (which predate
+  // the `bucket` field being added) still get the correct due-phase badge.
+  const flatStories: CategorizedStory[] = BUCKET_ORDER.flatMap((bucket) =>
+    (stories[bucket] ?? []).map((s) => ({ ...s, bucket: s.bucket ?? bucket }))
+  );
 
   return (
     <div className="rounded-[10px] bg-[var(--color-surface-1)] border border-[var(--color-border)] overflow-hidden transition-all duration-200">
@@ -237,17 +241,17 @@ function ActiveTeamsTable({ stories }: { stories: CategorizedStory[] }) {
           <thead>
             <tr className="border-b border-[var(--color-border)] text-[10px] text-[var(--color-text-dim)] uppercase tracking-wider">
               <th className="py-2 font-medium w-auto min-w-[260px]">Task / Story Name</th>
-              <th className="py-2 font-medium w-52 px-4">Assignees</th>
-              <th className="py-2 font-medium w-40 px-4">Status</th>
               <th className="py-2 font-medium w-32 px-4">Due</th>
+              <th className="py-2 font-medium w-52 px-4">Assignees</th>
+              <th className="py-2 font-medium w-28 px-4 text-right">Deadline</th>
+              <th className="py-2 font-medium w-40 px-4">Status</th>
               <th className="py-2 font-medium w-28 px-4">Priority</th>
-              <th className="py-2 font-medium w-28 text-right">Deadline</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--color-border)]/50">
             {stories.map((story) => (
               <tr key={story.id} className="group hover:bg-[var(--color-surface-2)] transition-colors">
-                <td className="py-2.5 pr-6 text-[13px] truncate">
+                <td className="py-2.5 pr-4 text-[13px] truncate">
                   <a
                     href={story.app_url}
                     target="_blank"
@@ -258,8 +262,14 @@ function ActiveTeamsTable({ stories }: { stories: CategorizedStory[] }) {
                     <ExternalLink size={10} className="shrink-0 opacity-0 group-hover:opacity-40 transition-opacity" />
                   </a>
                 </td>
+                <td className="py-2.5 px-4">
+                  <DueBadge bucket={story.bucket} />
+                </td>
                 <td className="py-2.5 px-4 text-[12px] text-[var(--color-text-muted)] truncate">
                   {story.owners.length > 0 ? story.owners.join(', ') : <span className="text-[var(--color-text-dim)] italic">Unassigned</span>}
+                </td>
+                <td className="py-2.5 px-4 text-[11px] text-[var(--color-text-dim)] text-right tabular-nums whitespace-nowrap" suppressHydrationWarning>
+                  {story.deadline ? new Date(story.deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
                 </td>
                 <td className="py-2.5 px-4 truncate">
                   <span className="inline-block px-1.5 py-0.5 rounded-[4px] bg-[var(--color-surface-3)] text-[10px] font-bold text-[var(--color-text-muted)] border border-[var(--color-border)] truncate max-w-full">
@@ -267,13 +277,7 @@ function ActiveTeamsTable({ stories }: { stories: CategorizedStory[] }) {
                   </span>
                 </td>
                 <td className="py-2.5 px-4">
-                  <DueBadge bucket={story.bucket} />
-                </td>
-                <td className="py-2.5 px-4">
                   <PriorityBadge priority={story.priority} />
-                </td>
-                <td className="py-2.5 text-[11px] text-[var(--color-text-dim)] text-right tabular-nums whitespace-nowrap" suppressHydrationWarning>
-                  {story.deadline ? new Date(story.deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
                 </td>
               </tr>
             ))}
