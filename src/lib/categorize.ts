@@ -1,19 +1,10 @@
-import { CategorizedStories, CategorizedStory, ShortcutStory } from './types';
-
-const today = new Date();
-today.setHours(0, 0, 0, 0);
-
-const endOfToday = new Date();
-endOfToday.setHours(23, 59, 59, 999);
-
-const endOfWeek = new Date();
-endOfWeek.setDate(endOfWeek.getDate() + 7);
-endOfWeek.setHours(23, 59, 59, 999);
+import { CategorizedStories, CategorizedStory, DueBucket, ShortcutStory } from './types';
 
 export function categorizeStories(
   stories: ShortcutStory[],
   memberMap: Record<string, string>,
-  stateMap: Record<number, string> = {}
+  stateMap: Record<number, string> = {},
+  priorityFieldId?: string
 ): CategorizedStories {
   const now = new Date();
   const todayStart = new Date(now);
@@ -42,6 +33,32 @@ export function categorizeStories(
       .map((id) => memberMap[id])
       .filter(Boolean);
 
+    // Extract priority from custom_fields if we know the field ID
+    let priority: string | undefined;
+    if (priorityFieldId && story.custom_fields) {
+      const field = story.custom_fields.find((f) => f.field_id === priorityFieldId);
+      if (field?.value) priority = field.value;
+    }
+
+    let bucket: DueBucket;
+
+    if (!story.deadline) {
+      bucket = 'no_due_date';
+    } else {
+      const deadline = new Date(story.deadline);
+      deadline.setHours(0, 0, 0, 0);
+
+      if (deadline < todayStart) {
+        bucket = 'overdue';
+      } else if (deadline <= todayEnd) {
+        bucket = 'today';
+      } else if (deadline <= weekEnd) {
+        bucket = 'this_week';
+      } else {
+        bucket = 'later';
+      }
+    }
+
     const categorized: CategorizedStory = {
       id: story.id,
       name: story.name,
@@ -49,25 +66,11 @@ export function categorizeStories(
       deadline: story.deadline,
       owners,
       state: stateMap[story.workflow_state_id],
+      bucket,
+      priority,
     };
 
-    if (!story.deadline) {
-      result.no_due_date.push(categorized);
-    } else {
-      const deadline = new Date(story.deadline);
-      deadline.setHours(0, 0, 0, 0);
-
-      if (deadline < todayStart) {
-        result.overdue.push(categorized);
-      } else if (deadline <= todayEnd) {
-        result.today.push(categorized);
-      } else if (deadline <= weekEnd) {
-        result.this_week.push(categorized);
-      } else {
-        result.later.push(categorized);
-      }
-    }
-
+    result[bucket].push(categorized);
     result.total++;
   }
 

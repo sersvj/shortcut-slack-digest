@@ -44,7 +44,10 @@ export interface ShortcutStory {
   completed: boolean;
   archived: boolean;
   story_type: string;
+  custom_fields?: Array<{ field_id: string; value: string }>;
 }
+
+export type DueBucket = 'overdue' | 'today' | 'this_week' | 'later' | 'no_due_date';
 
 export interface CategorizedStory {
   id: number;
@@ -53,6 +56,8 @@ export interface CategorizedStory {
   deadline: string | null;
   owners: string[];
   state?: string;
+  bucket?: DueBucket;
+  priority?: string;
 }
 
 export interface CategorizedStories {

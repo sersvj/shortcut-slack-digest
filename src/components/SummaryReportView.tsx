@@ -2,7 +2,72 @@
 
 import { useState, useEffect } from 'react';
 import { ChevronDown, ChevronRight, ExternalLink, Users, AlertCircle, Clock, Calendar, CalendarClock, CalendarDays, Search, Loader2, UserX } from 'lucide-react';
-import { ShortcutGroup, CategorizedStories, CategorizedStory, AppConfig, TeamlessRequester } from '@/lib/types';
+import { ShortcutGroup, CategorizedStories, CategorizedStory, DueBucket, AppConfig, TeamlessRequester } from '@/lib/types';
+
+// ---- Due bucket config (color, label, icon) ----
+
+type BucketMeta = { label: string; color: string; icon: React.ReactNode };
+
+const BUCKET_ORDER: DueBucket[] = ['overdue', 'today', 'this_week', 'later', 'no_due_date'];
+
+const BUCKET_META: Record<DueBucket, BucketMeta> = {
+  overdue:     { label: 'Overdue',       color: 'var(--color-danger)',       icon: <AlertCircle  size={11} /> },
+  today:       { label: 'Due Today',     color: 'var(--color-warning)',      icon: <Clock        size={11} /> },
+  this_week:   { label: 'Due This Week', color: 'var(--color-success)',      icon: <CalendarClock size={11} /> },
+  later:       { label: 'Due Later',     color: '#818cf8',                   icon: <CalendarDays size={11} /> },
+  no_due_date: { label: 'No Due Date',   color: 'var(--color-text-muted)',   icon: <Calendar     size={11} /> },
+};
+
+// ---- Priority config ----
+
+type PriorityLevel = 'Highest' | 'High' | 'Medium' | 'Low' | 'Lowest';
+
+const PRIORITY_META: Record<PriorityLevel, { dot: string; text: string; bg: string; border: string }> = {
+  Highest: { dot: '#f87171', text: '#f87171', bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.25)' },
+  High:    { dot: '#fb923c', text: '#fb923c', bg: 'rgba(249,115,22,0.1)', border: 'rgba(249,115,22,0.25)' },
+  Medium:  { dot: '#facc15', text: '#ca8a04', bg: 'rgba(234,179,8,0.1)',  border: 'rgba(234,179,8,0.25)' },
+  Low:     { dot: '#34d399', text: '#34d399', bg: 'rgba(52,211,153,0.1)', border: 'rgba(52,211,153,0.25)' },
+  Lowest:  { dot: '#94a3b8', text: '#94a3b8', bg: 'rgba(148,163,184,0.08)', border: 'rgba(148,163,184,0.2)' },
+};
+
+function PriorityBadge({ priority }: { priority?: string }) {
+  if (!priority) {
+    return <span className="text-[11px] text-[var(--color-text-dim)] italic">—</span>;
+  }
+  const meta = PRIORITY_META[priority as PriorityLevel];
+  if (!meta) {
+    return <span className="text-[11px] text-[var(--color-text-muted)]">{priority}</span>;
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] text-[10px] font-bold whitespace-nowrap border"
+      style={{ color: meta.text, background: meta.bg, borderColor: meta.border }}
+    >
+      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: meta.dot }} />
+      {priority}
+    </span>
+  );
+}
+
+function DueBadge({ bucket }: { bucket?: DueBucket }) {
+  if (!bucket) return <span className="text-[11px] text-[var(--color-text-dim)] italic">—</span>;
+  const meta = BUCKET_META[bucket];
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] text-[10px] font-bold whitespace-nowrap border"
+      style={{
+        color: meta.color,
+        background: `color-mix(in srgb, ${meta.color} 12%, transparent)`,
+        borderColor: `color-mix(in srgb, ${meta.color} 30%, transparent)`,
+      }}
+    >
+      {meta.icon}
+      {meta.label}
+    </span>
+  );
+}
+
+// ---- Props ----
 
 interface SummaryReportViewProps {
   groups: ShortcutGroup[];
@@ -128,6 +193,9 @@ function TeamAccordion({ group, stories }: { group: ShortcutGroup; stories?: Cat
 
   if (!stories) return null;
 
+  // Flatten all stories in canonical bucket order, preserving bucket annotation
+  const flatStories: CategorizedStory[] = BUCKET_ORDER.flatMap((bucket) => stories[bucket]);
+
   return (
     <div className="rounded-[10px] bg-[var(--color-surface-1)] border border-[var(--color-border)] overflow-hidden transition-all duration-200">
       <button
@@ -150,17 +218,101 @@ function TeamAccordion({ group, stories }: { group: ShortcutGroup; stories?: Cat
           {stories.total === 0 ? (
             <p className="text-[13px] text-[var(--color-text-dim)] italic py-2">No open stories.</p>
           ) : (
-            <div className="space-y-6 mt-2">
-              <SummarySection label="Overdue" color="var(--color-danger)" stories={stories.overdue} icon={<AlertCircle size={14} />} />
-              <SummarySection label="Due Today" color="var(--color-warning)" stories={stories.today} icon={<Clock size={14} />} />
-              <SummarySection label="Due This Week" color="var(--color-success)" stories={stories.this_week} icon={<CalendarClock size={14} />} />
-              <SummarySection label="Due Later" color="#818cf8" stories={stories.later} icon={<CalendarDays size={14} />} />
-              <SummarySection label="No Due Date" color="var(--color-text-muted)" stories={stories.no_due_date} icon={<Calendar size={14} />} />
-            </div>
+            <ActiveTeamsTable stories={flatStories} />
           )}
         </div>
       )}
     </div>
+  );
+}
+
+// ---- Flat story table for Active Teams tab ----
+
+function ActiveTeamsTable({ stories }: { stories: CategorizedStory[] }) {
+  return (
+    <>
+      {/* Desktop table */}
+      <div className="overflow-x-auto hidden md:block mt-2">
+        <table className="w-full text-left border-collapse table-fixed">
+          <thead>
+            <tr className="border-b border-[var(--color-border)] text-[10px] text-[var(--color-text-dim)] uppercase tracking-wider">
+              <th className="py-2 font-medium w-auto min-w-[260px]">Task / Story Name</th>
+              <th className="py-2 font-medium w-52 px-4">Assignees</th>
+              <th className="py-2 font-medium w-40 px-4">Status</th>
+              <th className="py-2 font-medium w-32 px-4">Due</th>
+              <th className="py-2 font-medium w-28 px-4">Priority</th>
+              <th className="py-2 font-medium w-28 text-right">Deadline</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--color-border)]/50">
+            {stories.map((story) => (
+              <tr key={story.id} className="group hover:bg-[var(--color-surface-2)] transition-colors">
+                <td className="py-2.5 pr-6 text-[13px] truncate">
+                  <a
+                    href={story.app_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-[var(--color-text-primary)] hover:text-[var(--color-tg-orange)] transition-colors"
+                  >
+                    <span className="truncate">{story.name}</span>
+                    <ExternalLink size={10} className="shrink-0 opacity-0 group-hover:opacity-40 transition-opacity" />
+                  </a>
+                </td>
+                <td className="py-2.5 px-4 text-[12px] text-[var(--color-text-muted)] truncate">
+                  {story.owners.length > 0 ? story.owners.join(', ') : <span className="text-[var(--color-text-dim)] italic">Unassigned</span>}
+                </td>
+                <td className="py-2.5 px-4 truncate">
+                  <span className="inline-block px-1.5 py-0.5 rounded-[4px] bg-[var(--color-surface-3)] text-[10px] font-bold text-[var(--color-text-muted)] border border-[var(--color-border)] truncate max-w-full">
+                    {story.state || 'Unknown'}
+                  </span>
+                </td>
+                <td className="py-2.5 px-4">
+                  <DueBadge bucket={story.bucket} />
+                </td>
+                <td className="py-2.5 px-4">
+                  <PriorityBadge priority={story.priority} />
+                </td>
+                <td className="py-2.5 text-[11px] text-[var(--color-text-dim)] text-right tabular-nums whitespace-nowrap" suppressHydrationWarning>
+                  {story.deadline ? new Date(story.deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile cards */}
+      <div className="md:hidden space-y-3 mt-2">
+        {stories.map((story) => (
+          <div key={story.id} className="p-3 bg-[var(--color-surface-2)] rounded-[8px] border border-[var(--color-border)]/50">
+            <a
+              href={story.app_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block text-[14px] font-bold text-[var(--color-text-primary)] hover:text-[var(--color-tg-orange)] transition-colors mb-2"
+            >
+              {story.name}
+            </a>
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <span className="inline-block px-1.5 py-0.5 rounded-[4px] bg-[var(--color-surface-3)] text-[10px] font-bold text-[var(--color-text-muted)] border border-[var(--color-border)]">
+                {story.state || 'Unknown'}
+              </span>
+              <DueBadge bucket={story.bucket} />
+              <PriorityBadge priority={story.priority} />
+              {story.deadline && (
+                <span className="text-[11px] text-[var(--color-text-dim)] font-medium tabular-nums" suppressHydrationWarning>
+                  {new Date(story.deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </span>
+              )}
+            </div>
+            <div className="text-[12px] text-[var(--color-text-muted)] font-medium border-t border-[var(--color-border)] pt-2 mt-2">
+              <span className="text-[var(--color-text-dim)] uppercase text-[10px] tracking-wider block mb-0.5">Assignees</span>
+              {story.owners.length > 0 ? story.owners.join(', ') : <span className="italic opacity-50">Unassigned</span>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -198,7 +350,7 @@ function RequesterAccordion({ requester }: { requester: TeamlessRequester }) {
   );
 }
 
-// ---- Shared story table for teamless tasks ----
+// ---- Shared story table for Teamless Tasks tab ----
 
 function StoryTable({ stories }: { stories: CategorizedStory[] }) {
   return (
@@ -275,90 +427,5 @@ function StoryTable({ stories }: { stories: CategorizedStory[] }) {
         ))}
       </div>
     </>
-  );
-}
-
-// ---- Shared summary section for Active Teams tab ----
-
-function SummarySection({ label, color, stories, icon }: { label: string; color: string; stories: CategorizedStory[]; icon: React.ReactNode }) {
-  if (stories.length === 0) return null;
-
-  return (
-    <div>
-      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color }}>
-        {icon}
-        {label} ({stories.length})
-      </div>
-      <div className="overflow-x-auto hidden md:block">
-        <table className="w-full text-left border-collapse table-fixed">
-          <thead>
-            <tr className="border-b border-[var(--color-border)] text-[10px] text-[var(--color-text-dim)] uppercase tracking-wider">
-              <th className="py-2 font-medium w-auto min-w-[300px]">Task / Story Name</th>
-              <th className="py-2 font-medium w-64 px-4">Assignees</th>
-              <th className="py-2 font-medium w-48 px-4">Status</th>
-              <th className="py-2 font-medium w-32 text-right">Deadline</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[var(--color-border)]/50">
-            {stories.map((story) => (
-              <tr key={story.id} className="group hover:bg-[var(--color-surface-2)] transition-colors">
-                <td className="py-2.5 pr-6 text-[13px] truncate">
-                  <a
-                    href={story.app_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-[var(--color-text-primary)] hover:text-[var(--color-tg-orange)] transition-colors"
-                  >
-                    <span className="truncate">{story.name}</span>
-                    <ExternalLink size={10} className="shrink-0 opacity-0 group-hover:opacity-40 transition-opacity" />
-                  </a>
-                </td>
-                <td className="py-2.5 px-4 text-[12px] text-[var(--color-text-muted)] truncate">
-                  {story.owners.length > 0 ? story.owners.join(', ') : <span className="text-[var(--color-text-dim)] italic">Unassigned</span>}
-                </td>
-                <td className="py-2.5 px-4 truncate">
-                  <span className="inline-block px-1.5 py-0.5 rounded-[4px] bg-[var(--color-surface-3)] text-[10px] font-bold text-[var(--color-text-muted)] border border-[var(--color-border)] truncate max-w-full">
-                    {story.state || 'Unknown'}
-                  </span>
-                </td>
-                <td className="py-2.5 text-[11px] text-[var(--color-text-dim)] text-right tabular-nums whitespace-nowrap" suppressHydrationWarning>
-                  {story.deadline ? new Date(story.deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Mobile view: Stacked cards */}
-      <div className="md:hidden space-y-3">
-        {stories.map((story) => (
-          <div key={story.id} className="p-3 bg-[var(--color-surface-2)] rounded-[8px] border border-[var(--color-border)]/50">
-            <a
-              href={story.app_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block text-[14px] font-bold text-[var(--color-text-primary)] hover:text-[var(--color-tg-orange)] transition-colors mb-2"
-            >
-              {story.name}
-            </a>
-            <div className="flex flex-wrap items-center gap-2 mb-2">
-              <span className="px-1.5 py-0.5 rounded-[4px] bg-[var(--color-surface-3)] text-[10px] font-bold text-[var(--color-text-muted)] border border-[var(--color-border)]">
-                {story.state || 'Unknown'}
-              </span>
-               {story.deadline && (
-                  <span className="text-[11px] text-[var(--color-text-dim)] font-medium" suppressHydrationWarning>
-                    Due {new Date(story.deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  </span>
-               )}
-            </div>
-            <div className="text-[12px] text-[var(--color-text-muted)] font-medium border-t border-[var(--color-border)] pt-2 mt-2">
-              <span className="text-[var(--color-text-dim)] uppercase text-[10px] tracking-wider block mb-0.5">Assignees</span>
-              {story.owners.length > 0 ? story.owners.join(', ') : <span className="italic opacity-50">Unassigned</span>}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
   );
 }
