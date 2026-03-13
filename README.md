@@ -2,21 +2,36 @@
 
 Internal tool that pulls open tasks from Shortcut (by Team) and sends formatted task digests to mapped Slack channels.
 
-**Live:** `https://YOUR-APP.vercel.app`
-**Repo:** `https://github.com/YOUR-USERNAME/shortcut-slack-digest`
-
 ---
 
 ## Features
 
-- **Dashboard** — two-column Active/Inactive layout, live search, story count summary
-- **Per-team digest previews** — collapsible preview showing all 5 due-date buckets before sending
-- **Slack Block Kit messages** — clean formatted digests with sections for Overdue, Due Today, Due This Week, Due Later, No Due Date
-- **Slack channel mapping** — assign any Slack channel to any Shortcut Team
-- **Manual send** — send all active digests with one click, or send individual teams
-- **Auth** — Slack OAuth login, restricted to specified workspace only
+### Team Tasks
+- **Two-column Active/Inactive layout** — drag teams between columns to control which ones get included in bulk sends
+- **Per-team Slack channel mapping** — assign any Slack channel to any Shortcut team
+- **Digest preview** — collapsible per-team preview showing all due-date buckets (Overdue, Due Today, Due This Week, Due Later, No Due Date) before sending
+- **Manual send** — send all active digests at once, or send individual teams
+- **Scheduled sends** — configurable cron schedule (day, time, timezone) for automated digests
+- **Live search** — filter teams by name in real time
+- **Story caching** — data cached in `localStorage`, refreshed on demand
+
+### Team Members
+- **Per-member digest view** — see stories each team member owns and has requested, categorized by due date
+- **Slack DM integration** — send each opted-in member a personal Monday digest via Slack DM
+- **Opt-in control** — members can be individually opted in/out of automated digests
+- **Member–Slack user mapping** — link Shortcut members to their Slack user IDs
+- **Search** — filter members by name
+
+### Summary Report
+- **Active Teams tab** — condensed table view of all active teams' stories, grouped by due-date bucket, with name/link, assignees, status, and deadline
+- **Teamless Tasks tab** — all open stories with no team assignment, grouped by requester (accordion per person) with the same story details
+- **Search** — filter active teams by name
+- **Refresh** — reload data on demand with a live "Updated HH:MM" timestamp
+
+### General
+- **Slack OAuth login** — restricted to a specified workspace
+- **Slack Block Kit messages** — richly formatted digest messages
 - **Persistence** — Upstash Redis on Vercel; local filesystem fallback for dev
-- **Caching** — story data cached in `localStorage`, only refreshed on manual refresh
 
 ---
 
@@ -82,6 +97,7 @@ In your Slack app at [api.slack.com](https://api.slack.com):
 - `chat:write`
 - `channels:read`
 - `groups:read`
+- `im:write`
 
 **User Token Scopes** (OAuth & Permissions → User Token Scopes):
 - `identity.basic`
@@ -103,7 +119,7 @@ In your Slack app at [api.slack.com](https://api.slack.com):
 
 ```bash
 git add .
-git commit -m "your message"
+git commit -m "feat: your message"
 git push origin main
 ```
 
