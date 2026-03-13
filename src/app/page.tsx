@@ -18,7 +18,7 @@ import {
   ChevronUp,
   ArrowUp,
 } from 'lucide-react';
-import { ShortcutGroup, CategorizedStories, SlackChannel, AppConfig, CronConfig } from '@/lib/types';
+import { ShortcutGroup, CategorizedStories, SlackChannel, AppConfig, CronConfig, TeamlessRequester } from '@/lib/types';
 import { ClientCard } from '@/components/ClientCard';
 import { CronSettingsModal } from '@/components/CronSettingsModal';
 import { MembersView, MembersViewHandle } from '@/components/MembersView';
@@ -104,6 +104,12 @@ function DashboardInner() {
   const [membersStats, setMembersStats] = useState({ loading: true, optedInCount: 0, total: 0 });
   const [sendingAllMembers, setSendingAllMembers] = useState(false);
 
+  // ---- Teamless stories state ----
+  const [teamlessRequesters, setTeamlessRequesters] = useState<TeamlessRequester[] | null>(null);
+  const [teamlessLoading, setTeamlessLoading] = useState(false);
+  const [teamlessLoaded, setTeamlessLoaded] = useState(false);
+  const [teamlessLastRefreshedAt, setTeamlessLastRefreshedAt] = useState<Date | null>(null);
+
   const handleSendAllMembers = useCallback(async () => {
     setSendingAllMembers(true);
     try {
@@ -112,6 +118,24 @@ function DashboardInner() {
       setSendingAllMembers(false);
     }
   }, []);
+
+  // ---- Fetch teamless stories (lazy, on first summary view visit) ----
+  const loadTeamlessStories = useCallback(async (forceRefresh = false) => {
+    if (teamlessLoaded && !forceRefresh) return;
+    setTeamlessLoading(true);
+    try {
+      const res = await fetch('/api/shortcut/teamless-stories');
+      if (res.ok) {
+        setTeamlessRequesters(await res.json());
+        setTeamlessLastRefreshedAt(new Date());
+      }
+    } catch {
+      // silent fail
+    } finally {
+      setTeamlessLoading(false);
+      setTeamlessLoaded(true);
+    }
+  }, [teamlessLoaded]);
 
   const addToast = useCallback((type: 'success' | 'error', message: string) => {
     const id = ++toastId;
@@ -437,32 +461,56 @@ function DashboardInner() {
         <div className="flex flex-col lg:flex-row lg:items-center justify-between px-4 sm:px-6 py-3 lg:h-14 bg-[var(--color-surface-2)]/80 border-b border-[var(--color-border)]/50 gap-4 lg:gap-6">
 
           {activeView === 'summary' ? (
-            <div className="flex-1 flex justify-center w-full">
-              <div className="relative group w-full max-w-xl">
-                <Search
-                  size={14}
-                  className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors ${
-                    summarySearch ? 'text-[var(--color-tg-orange)]' : 'text-[var(--color-text-dim)]'
-                  }`}
-                />
-                <input
-                  type="text"
-                  placeholder="Filter active teams…"
-                  value={summarySearch}
-                  onChange={(e) => setSummarySearch(e.target.value)}
+            <>
+              {/* Summary: Refresh + timestamp */}
+              <div className="flex items-center gap-3 order-2 lg:order-1 lg:min-w-[200px]">
+                <button
+                  onClick={() => loadTeamlessStories(true)}
                   suppressHydrationWarning
-                  className="w-full pl-9 pr-9 py-2 rounded-[8px] bg-[var(--color-surface-base)] border border-[var(--color-border)] text-[var(--color-text-primary)] text-[14px] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-tg-orange)] focus:ring-1 focus:ring-[var(--color-tg-orange)]/20 transition-all shadow-inner"
-                />
-                {summarySearch && (
-                  <button
-                    onClick={() => setSummarySearch('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-[var(--color-surface-3)] text-[var(--color-text-dim)] hover:text-[var(--color-text-primary)] transition-colors"
-                  >
-                    <X size={14} />
-                  </button>
+                  disabled={teamlessLoading}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-[6px] bg-[var(--color-surface-3)] border border-[var(--color-border)] hover:border-[var(--color-border-light)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] text-[13px] font-medium transition-colors disabled:opacity-50 shadow-sm"
+                >
+                  <RefreshCw size={14} className={teamlessLoading ? 'animate-spin-fast' : ''} />
+                  <span className="hidden xs:inline">Refresh</span>
+                </button>
+                {teamlessLastRefreshedAt && !teamlessLoading && (
+                  <span className="text-[11px] text-[var(--color-text-dim)] font-medium tabular-nums whitespace-nowrap" suppressHydrationWarning>
+                    Updated {teamlessLastRefreshedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
                 )}
               </div>
-            </div>
+
+              {/* Summary: Search (Active Teams tab only) */}
+              <div className="flex-1 flex justify-center w-full lg:max-w-2xl order-1 lg:order-2">
+                <div className="relative group w-full max-w-xl">
+                  <Search
+                    size={14}
+                    className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors ${
+                      summarySearch ? 'text-[var(--color-tg-orange)]' : 'text-[var(--color-text-dim)]'
+                    }`}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Filter active teams…"
+                    value={summarySearch}
+                    onChange={(e) => setSummarySearch(e.target.value)}
+                    suppressHydrationWarning
+                    className="w-full pl-9 pr-9 py-2 rounded-[8px] bg-[var(--color-surface-base)] border border-[var(--color-border)] text-[var(--color-text-primary)] text-[14px] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-tg-orange)] focus:ring-1 focus:ring-[var(--color-tg-orange)]/20 transition-all shadow-inner"
+                  />
+                  {summarySearch && (
+                    <button
+                      onClick={() => setSummarySearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-[var(--color-surface-3)] text-[var(--color-text-dim)] hover:text-[var(--color-text-primary)] transition-colors"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Summary: right spacer (balances layout so search stays centered) */}
+              <div className="flex items-center gap-2 order-3 lg:order-3 lg:min-w-[200px] lg:justify-end" />
+            </>
           ) : activeView === 'teams' ? (
             <>
               {/* Team Tasks: Refresh + timestamp */}
@@ -606,6 +654,9 @@ function DashboardInner() {
           config={config}
           storiesMap={storiesMap}
           search={summarySearch}
+          teamlessRequesters={teamlessRequesters}
+          teamlessLoading={teamlessLoading}
+          onMount={loadTeamlessStories}
         />
       ) : activeView === 'members' ? (
         <MembersView

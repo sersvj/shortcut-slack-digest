@@ -40,6 +40,7 @@ export interface ShortcutStory {
   owner_ids: string[];
   requested_by_id: string;
   workflow_state_id: number;
+  group_id: string | null;
   completed: boolean;
   archived: boolean;
   story_type: string;
@@ -87,6 +88,12 @@ export interface MemberDigest {
   name: string;
   owned: CategorizedStories;
   requested: CategorizedStories;
+}
+
+export interface TeamlessRequester {
+  id: string;
+  name: string;
+  stories: CategorizedStory[];
 }
 
 export interface CronConfig {
