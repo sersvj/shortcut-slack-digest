@@ -42,6 +42,7 @@ export interface ShortcutStory {
   workflow_state_id: number;
   group_id: string | null;
   completed: boolean;
+  completed_at: string | null;
   archived: boolean;
   story_type: string;
   custom_fields?: Array<{ field_id: string; value: string }>;
@@ -124,4 +125,31 @@ export interface ClientCardData {
 export interface SlackUser {
   id: string;
   name: string;
+}
+
+// ---- Cashboard types ----
+
+export interface CashboardProject {
+  id: number;
+  name: string;
+  client_name: string | null;
+}
+
+export interface CashboardLineItem {
+  id: number;
+  name: string;
+  project_id: number;
+}
+
+// ---- My Stories (Time Tracker) ----
+
+export interface MyStory {
+  id: number;
+  name: string;
+  app_url: string;
+  deadline: string | null;
+  group_id: string | null;
+  state?: string;
+  completed: boolean;
+  completed_at: string | null;
 }

@@ -23,6 +23,7 @@ import { ClientCard } from '@/components/ClientCard';
 import { CronSettingsModal } from '@/components/CronSettingsModal';
 import { MembersView, MembersViewHandle } from '@/components/MembersView';
 import { SummaryReportView } from '@/components/SummaryReportView';
+import { TimeTrackerView } from '@/components/TimeTrackerView';
 
 interface Toast {
   id: number;
@@ -80,16 +81,55 @@ function DashboardInner() {
   // ---- URL-based view routing ----
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [activeView, setActiveView] = useState<'teams' | 'members' | 'summary'>('teams');
+  const [activeView, setActiveView] = useState<'teams' | 'members' | 'summary' | 'timetracker'>('teams');
+  const [isTimeTrackerAllowed, setIsTimeTrackerAllowed] = useState(false);
+  const [ttRefreshTrigger, setTtRefreshTrigger] = useState(0);
+  const [ttCashboardLoading, setTtCashboardLoading] = useState(false);
+  const [ttLastRefreshed, setTtLastRefreshed] = useState<Date | null>(null);
 
   useEffect(() => {
     const v = searchParams.get('view');
     if (v === 'members') setActiveView('members');
     else if (v === 'summary') setActiveView('summary');
+    else if (v === 'timetracker') setActiveView('timetracker');
     else setActiveView('teams');
   }, [searchParams]);
 
-  const switchView = useCallback((view: 'teams' | 'members' | 'summary') => {
+  useEffect(() => {
+    fetch('/api/cashboard/me')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.allowed !== true) return;
+        setIsTimeTrackerAllowed(true);
+
+        // Prefetch Cashboard data into localStorage cache so the Time Tracker
+        // tab loads instantly when the user clicks it.
+        const CACHE_KEY = 'tt-cashboard-cache-v2';
+        const TTL = 60 * 60 * 1000;
+        try {
+          const raw = localStorage.getItem(CACHE_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Date.now() - new Date(parsed.cachedAt).getTime() < TTL) return;
+          }
+        } catch {}
+
+        Promise.all([
+          fetch('/api/cashboard/projects').then((r) => r.json()),
+          fetch('/api/cashboard/line-items').then((r) => r.json()),
+        ]).then(([projects, lineItems]) => {
+          localStorage.setItem(CACHE_KEY, JSON.stringify({
+            projects,
+            lineItems,
+            personId: d.personId ?? null,
+            cachedAt: new Date().toISOString(),
+          }));
+        }).catch(() => {});
+      })
+      .catch(() => {});
+  }, []);
+
+  const switchView = useCallback((view: 'teams' | 'members' | 'summary' | 'timetracker') => {
     setActiveView(view);
     const params = new URLSearchParams(Array.from(searchParams.entries()));
     params.set('view', view);
@@ -422,6 +462,19 @@ function DashboardInner() {
               >
                 Summary Report
               </button>
+              {isTimeTrackerAllowed && (
+                <button
+                  onClick={() => switchView('timetracker')}
+                  suppressHydrationWarning
+                  className={`px-3 py-1.5 rounded-[6px] text-[13px] font-medium transition-colors whitespace-nowrap ${
+                    activeView === 'timetracker'
+                      ? 'bg-[var(--color-tg-orange)]/15 text-[var(--color-tg-orange)]'
+                      : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-3)]'
+                  }`}
+                >
+                  Time Tracker
+                </button>
+              )}
             </div>
           </div>
 
@@ -460,7 +513,23 @@ function DashboardInner() {
         {/* Contextual Action Bar */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between px-4 sm:px-6 py-3 lg:h-14 bg-[var(--color-surface-2)]/80 border-b border-[var(--color-border)]/50 gap-4 lg:gap-6">
 
-          {activeView === 'summary' ? (
+          {activeView === 'timetracker' ? (
+            <div className="flex items-center gap-3 order-2 lg:order-1 lg:min-w-[200px]">
+              <button
+                onClick={() => setTtRefreshTrigger((n) => n + 1)}
+                disabled={ttCashboardLoading}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-[6px] bg-[var(--color-surface-3)] border border-[var(--color-border)] hover:border-[var(--color-border-light)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] text-[13px] font-medium transition-colors disabled:opacity-50 shadow-sm"
+              >
+                <RefreshCw size={14} className={ttCashboardLoading ? 'animate-spin-fast' : ''} />
+                <span className="hidden xs:inline">Refresh</span>
+              </button>
+              {ttLastRefreshed && !ttCashboardLoading && (
+                <span className="text-[11px] text-[var(--color-text-dim)] font-medium tabular-nums whitespace-nowrap" suppressHydrationWarning>
+                  Updated {ttLastRefreshed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+            </div>
+          ) : activeView === 'summary' ? (
             <>
               {/* Summary: Refresh + timestamp */}
               <div className="flex items-center gap-3 order-2 lg:order-1 lg:min-w-[200px]">
@@ -648,7 +717,14 @@ function DashboardInner() {
       </header>
 
       {/* Main content */}
-      {activeView === 'summary' ? (
+      {activeView === 'timetracker' ? (
+        <TimeTrackerView
+          groups={groups}
+          refreshTrigger={ttRefreshTrigger}
+          onCashboardLoadingChange={setTtCashboardLoading}
+          onCashboardRefreshed={() => setTtLastRefreshed(new Date())}
+        />
+      ) : activeView === 'summary' ? (
         <SummaryReportView
           groups={groups}
           config={config}
