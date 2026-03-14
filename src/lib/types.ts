@@ -141,6 +141,15 @@ export interface CashboardLineItem {
   project_id: number;
 }
 
+export interface CashboardTimeEntry {
+  id: number;
+  person_id: number;
+  line_item_id: number;
+  minutes: number;
+  description: string;
+  created_on: string;
+}
+
 // ---- My Stories (Time Tracker) ----
 
 export interface MyStory {

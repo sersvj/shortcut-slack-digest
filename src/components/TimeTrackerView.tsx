@@ -13,7 +13,7 @@ import {
   Calendar,
   X,
 } from 'lucide-react';
-import { ShortcutGroup, CashboardProject, CashboardLineItem, MyStory } from '@/lib/types';
+import { ShortcutGroup, CashboardProject, CashboardLineItem, MyStory, CashboardTimeEntry } from '@/lib/types';
 
 // ---- Types ----
 
@@ -86,6 +86,173 @@ function bestLineItemMatch(items: CashboardLineItem[], projectId: number): Cashb
   }
 
   return best;
+}
+
+// ---- Date Picker ----
+
+function DatePicker({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string; // YYYY-MM-DD
+  onChange: (val: string) => void;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Parse current value
+  const date = new Date(value + 'T12:00:00');
+  const month = date.getMonth();
+  const year = date.getFullYear();
+
+  // Helper to get days in month
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayOfMonth = new Date(year, month, 1).getDay(); // 0 = Sunday
+
+  // Previous month days to fill start of grid
+  const prevMonthLastDay = new Date(year, month, 0).getDate();
+  const emptyDays = firstDayOfMonth;
+
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  function setMonth(m: number) {
+    const next = new Date(year, m, 1);
+    // Ensure we don't skip days if current day is not available in next month
+    const currentDay = date.getDate();
+    const lastDayInNext = new Date(year, m + 1, 0).getDate();
+    next.setDate(Math.min(currentDay, lastDayInNext));
+    onChange(next.toISOString().slice(0, 10));
+  }
+
+  function setYear(y: number) {
+    const next = new Date(y, month, 1);
+    const currentDay = date.getDate();
+    const lastDayInNext = new Date(y, month + 1, 0).getDate();
+    next.setDate(Math.min(currentDay, lastDayInNext));
+    onChange(next.toISOString().slice(0, 10));
+  }
+
+  function selectDay(d: number) {
+    const next = new Date(year, month, d);
+    onChange(next.toISOString().slice(0, 10));
+    setOpen(false);
+  }
+
+  // Close on outside click
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    if (open) document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((o) => !o)}
+        className={`w-full flex items-center gap-2 px-3 py-2 rounded-[7px] bg-[var(--color-surface-base)] border text-[13px] text-left transition-colors disabled:opacity-40 ${
+          open
+            ? 'border-[var(--color-tg-orange)] ring-1 ring-[var(--color-tg-orange)]/20'
+            : 'border-[var(--color-border)] hover:border-[var(--color-border-light)]'
+        }`}
+      >
+        <Calendar size={13} className="text-[var(--color-text-dim)] shrink-0" />
+        <span className="text-[var(--color-text-primary)]">
+          {date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+        </span>
+      </button>
+
+      {open && (
+        <div className="absolute z-50 mt-1 w-[260px] rounded-[10px] bg-[var(--color-surface-2)] border border-[var(--color-border)] shadow-xl p-3 overflow-hidden select-none">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-1">
+              <select
+                value={month}
+                onChange={(e) => setMonth(parseInt(e.target.value))}
+                className="bg-transparent text-[13px] font-bold text-[var(--color-text-primary)] focus:outline-none cursor-pointer hover:text-[var(--color-tg-orange)]"
+              >
+                {monthNames.map((n, i) => <option key={i} value={i}>{n}</option>)}
+              </select>
+              <select
+                value={year}
+                onChange={(e) => setYear(parseInt(e.target.value))}
+                className="bg-transparent text-[13px] font-bold text-[var(--color-text-primary)] focus:outline-none cursor-pointer hover:text-[var(--color-tg-orange)]"
+              >
+                {Array.from({ length: 10 }, (_, i) => year - 5 + i).map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setMonth(month - 1)}
+                className="p-1 rounded-[4px] hover:bg-[var(--color-surface-3)] text-[var(--color-text-dim)]"
+              >
+                <ChevronDown size={14} className="rotate-90" />
+              </button>
+              <button
+                onClick={() => setMonth(month + 1)}
+                className="p-1 rounded-[4px] hover:bg-[var(--color-surface-3)] text-[var(--color-text-dim)]"
+              >
+                <ChevronDown size={14} className="-rotate-90" />
+              </button>
+            </div>
+          </div>
+
+          {/* Grid */}
+          <div className="grid grid-cols-7 gap-px text-center mb-1">
+            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d) => (
+              <div key={d} className="text-[10px] font-bold text-[var(--color-text-dim)] pb-1">{d}</div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {Array.from({ length: emptyDays }).map((_, i) => (
+              <div key={`empty-${i}`} className="text-[12px] text-[var(--color-text-dim)]/20 py-1.5">
+                {prevMonthLastDay - emptyDays + i + 1}
+              </div>
+            ))}
+            {Array.from({ length: daysInMonth }).map((_, i) => {
+              const d = i + 1;
+              const isToday = d === new Date().getDate() && month === new Date().getMonth() && year === new Date().getFullYear();
+              const isSelected = d === date.getDate();
+              return (
+                <button
+                  key={d}
+                  onClick={() => selectDay(d)}
+                  className={`text-[12px] py-1.5 rounded-[6px] transition-colors relative ${
+                    isSelected
+                      ? 'bg-[var(--color-tg-orange)] text-white font-bold'
+                      : isToday
+                      ? 'bg-[var(--color-tg-orange)]/10 text-[var(--color-tg-orange)] font-bold'
+                      : 'text-[var(--color-text-primary)] hover:bg-[var(--color-surface-3)]'
+                  }`}
+                >
+                  {d}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Today shortcut */}
+          <button
+            onClick={() => { onChange(today()); setOpen(false); }}
+            className="w-full mt-3 pt-2 border-t border-[var(--color-border)]/50 text-[11px] font-bold text-[var(--color-tg-orange)] hover:text-[var(--color-tg-orange-hover)] transition-colors uppercase tracking-wider"
+          >
+            Go to Today
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ---- Searchable Select ----
@@ -216,7 +383,6 @@ function SearchableSelect({
 function TimeEntryFormPanel({
   entryKey,
   initialNotes,
-  globalDate,
   projects,
   lineItems,
   onSubmit,
@@ -224,14 +390,13 @@ function TimeEntryFormPanel({
 }: {
   entryKey: EntryKey;
   initialNotes: string;
-  globalDate: string;
   projects: CashboardProject[];
   lineItems: CashboardLineItem[];
   onSubmit: (key: EntryKey, form: TimeEntryForm) => Promise<void>;
   onCancel: () => void;
 }) {
   const [form, setForm] = useState<TimeEntryForm>(() => ({
-    date: globalDate,
+    date: today(),
     projectId: '',
     lineItemId: '',
     notes: initialNotes,
@@ -243,7 +408,7 @@ function TimeEntryFormPanel({
   const projectOptions: SelectOption[] = [...projects]
     .sort((a, b) => (a.client_name ?? '').localeCompare(b.client_name ?? ''))
     .map((p) => ({ id: p.id, label: p.name, group: p.client_name ?? undefined }));
-  const lineItemOptions: SelectOption[] = lineItems
+  const lineItemOptions: SelectOption[] = (Array.isArray(lineItems) ? lineItems : [])
     .filter((li) => form.projectId === '' || li.project_id === form.projectId)
     .map((li) => ({ id: li.id, label: li.name ?? String(li.id) }));
 
@@ -282,11 +447,9 @@ function TimeEntryFormPanel({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-[11px] font-medium text-[var(--color-text-dim)] mb-1 uppercase tracking-wider">Date</label>
-          <input
-            type="date"
+          <DatePicker
             value={form.date}
-            onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-            className="w-full px-3 py-2 rounded-[7px] bg-[var(--color-surface-base)] border border-[var(--color-border)] text-[13px] text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-tg-orange)] focus:ring-1 focus:ring-[var(--color-tg-orange)]/20 transition-all"
+            onChange={(val) => setForm((f) => ({ ...f, date: val }))}
           />
         </div>
         <div>
@@ -435,7 +598,6 @@ export function TimeTrackerView({ groups, refreshTrigger = 0, onCashboardLoading
   const [expandedKey, setExpandedKey] = useState<EntryKey | null>(null);
   // Map of entry key → array of dates logged (e.g. ["Mar 13", "Mar 14"])
   const [loggedDates, setLoggedDates] = useState<Map<EntryKey, string[]>>(new Map());
-  const [globalDate, setGlobalDate] = useState<string>(today());
 
   // Keep stable refs to callbacks so they don't bust the load() useCallback
   const onLoadingChangeRef = useRef(onCashboardLoadingChange);
@@ -446,19 +608,66 @@ export function TimeTrackerView({ groups, refreshTrigger = 0, onCashboardLoading
   // Group id -> name lookup
   const groupMap = Object.fromEntries(groups.map((g) => [g.id, g.name]));
 
+  // Helper to process entries and map them to story IDs
+  const processEntries = useCallback((entries: CashboardTimeEntry[], currentStories: MyStory[]) => {
+    setLoggedDates((prev) => {
+      const next = new Map(prev);
+      entries.forEach((e) => {
+        // Try matching by ID first (looks for [sc-ID] in description)
+        const idMatch = e.description.match(/\[sc-(\d+)\]/);
+        let matchedStory: MyStory | undefined;
+
+        if (idMatch) {
+          const id = parseInt(idMatch[1]);
+          matchedStory = currentStories.find((s) => s.id === id);
+        }
+
+        // Fallback to name matching if no ID match found
+        if (!matchedStory) {
+          matchedStory = currentStories.find((s) =>
+            e.description.toLowerCase().includes(s.name.toLowerCase()) ||
+            s.name.toLowerCase().includes(e.description.toLowerCase())
+          );
+        }
+
+        if (matchedStory) {
+          // Robust date extraction: check created_on or date field
+          const rawDate = e.created_on || (e as any).date;
+          if (rawDate) {
+            // Ensure we handle YYYY-MM-DD or full timestamp by just taking the first 10 chars
+            const dateStr = rawDate.slice(0, 10);
+            const dateLabel = new Date(dateStr + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
+            if (dateLabel !== 'Invalid Date') {
+              const existing = next.get(matchedStory.id) ?? [];
+              if (!existing.includes(dateLabel)) {
+                next.set(matchedStory.id, [...existing, dateLabel]);
+              }
+            }
+          }
+        }
+      });
+      return next;
+    });
+  }, []);
+
   const load = useCallback(async (force = false) => {
     setStoriesLoading(true);
     setLoadError(null);
 
     // Serve Cashboard data from cache immediately if fresh (skipped on force refresh)
     const cache = force ? null : readCbCache();
-    if (cache) {
+    if (cache && Array.isArray(cache.projects) && Array.isArray(cache.lineItems)) {
       setProjects(cache.projects);
       setLineItems(cache.lineItems);
       setPersonId(cache.personId);
       setCashboardLoading(false);
       onLoadingChangeRef.current?.(false);
     } else {
+      // If cache is invalid or missing, clear it just in case
+      if (cache) {
+        try { localStorage.removeItem(CB_CACHE_KEY); } catch {}
+      }
       setCashboardLoading(true);
       onLoadingChangeRef.current?.(true);
     }
@@ -466,21 +675,43 @@ export function TimeTrackerView({ groups, refreshTrigger = 0, onCashboardLoading
     // Stories always fetch fresh, Cashboard fetches in parallel
     const qs = force ? '?refresh=1' : '';
     const storiesPromise = fetch('/api/shortcut/my-stories');
+
+    // Cashboard core data fetch
     const cashboardPromise = cache ? Promise.resolve(null) : Promise.all([
       fetch('/api/cashboard/me'),
       fetch(`/api/cashboard/projects${qs}`),
       fetch(`/api/cashboard/line-items${qs}`),
     ]);
 
+    // If we have a cached personId, we can fetch their entries in parallel with stories
+    const entriesPromise = (cache && cache.personId)
+      ? fetch(`/api/cashboard/time-entries?person_id=${cache.personId}`)
+      : null;
+
     // Resolve stories first — show them as soon as they're ready
+    let currentStories: MyStory[] = [];
     try {
       const storiesRes = await storiesPromise;
       if (!storiesRes.ok) throw new Error('Failed to load your Shortcut stories.');
-      setStories(await storiesRes.json());
+      currentStories = await storiesRes.json();
+      setStories(currentStories);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : 'Failed to load stories.');
     } finally {
       setStoriesLoading(false);
+    }
+
+    // Resolve entries if we fetched them in parallel
+    if (entriesPromise) {
+      try {
+        const eRes = await entriesPromise;
+        if (eRes.ok) {
+          const entries = await eRes.json() as CashboardTimeEntry[];
+          processEntries(entries, currentStories);
+        }
+      } catch (e) {
+        console.error('Failed to resolve parallel entries fetch:', e);
+      }
     }
 
     // Resolve Cashboard data (skipped if cache was fresh)
@@ -490,15 +721,33 @@ export function TimeTrackerView({ groups, refreshTrigger = 0, onCashboardLoading
         const [meRes, projectsRes, lineItemsRes] = results;
         if (!projectsRes.ok) throw new Error('Failed to load Cashboard projects.');
         if (!lineItemsRes.ok) throw new Error('Failed to load Cashboard work types.');
+
         const [meData, projectsData, lineItemsData] = await Promise.all([
           meRes.json(), projectsRes.json(), lineItemsRes.json(),
         ]);
+
         const pid = meData.personId ?? null;
+        const validProjects = Array.isArray(projectsData) ? projectsData : [];
+        const validLineItems = Array.isArray(lineItemsData) ? lineItemsData : [];
+
         setPersonId(pid);
-        setProjects(projectsData);
-        setLineItems(lineItemsData);
-        writeCbCache({ projects: projectsData, lineItems: lineItemsData, personId: pid });
+        setProjects(validProjects);
+        setLineItems(validLineItems);
+        writeCbCache({ projects: validProjects, lineItems: validLineItems, personId: pid });
         onRefreshedRef.current?.();
+
+        // If we just got the personId for the first time (and didn't fetch entries above), fetch them now
+        if (pid && !entriesPromise) {
+          try {
+            const eRes = await fetch(`/api/cashboard/time-entries?person_id=${pid}`);
+            if (eRes.ok) {
+              const entries = await eRes.json() as CashboardTimeEntry[];
+              processEntries(entries, currentStories);
+            }
+          } catch (e) {
+            console.error('Failed to fetch entries after me call:', e);
+          }
+        }
       } catch (e) {
         // Non-fatal — stories still show, form controls will be empty
         console.error('Cashboard load failed:', e);
@@ -507,7 +756,7 @@ export function TimeTrackerView({ groups, refreshTrigger = 0, onCashboardLoading
         onLoadingChangeRef.current?.(false);
       }
     }
-  }, []);
+  }, [processEntries]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -583,22 +832,9 @@ export function TimeTrackerView({ groups, refreshTrigger = 0, onCashboardLoading
   }
 
   return (
-    <main className="flex-1 overflow-y-auto px-4 sm:px-6 pt-4 sm:pt-6 pb-8 max-w-[900px] mx-auto w-full custom-scrollbar">
-
-      {/* Global date + person ID warning */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
-        <div className="flex items-center gap-3">
-          <Calendar size={15} className="text-[var(--color-text-dim)]" />
-          <div className="flex items-center gap-2">
-            <label className="text-[12px] text-[var(--color-text-muted)] font-medium">Default date</label>
-            <input
-              type="date"
-              value={globalDate}
-              onChange={(e) => setGlobalDate(e.target.value)}
-              className="px-2.5 py-1 rounded-[6px] bg-[var(--color-surface-base)] border border-[var(--color-border)] text-[13px] text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-tg-orange)] transition-all"
-            />
-          </div>
-        </div>
+    <main className="flex-1 overflow-y-auto px-4 sm:px-6 pt-4 sm:pt-6 pb-8 max-w-[900px] mx-auto w-full">
+      {/* Person ID warning */}
+      <div className="mb-5 flex justify-end">
         {cashboardLoading ? (
           <div className="flex items-center gap-2 text-[11px] text-[var(--color-text-dim)]">
             <Loader2 size={12} className="animate-spin-fast" />
@@ -647,7 +883,6 @@ export function TimeTrackerView({ groups, refreshTrigger = 0, onCashboardLoading
           <TimeEntryFormPanel
             entryKey="manual"
             initialNotes=""
-            globalDate={globalDate}
             projects={projects}
             lineItems={lineItems}
 
@@ -758,8 +993,7 @@ export function TimeTrackerView({ groups, refreshTrigger = 0, onCashboardLoading
                   <div className="px-4 pb-4">
                     <TimeEntryFormPanel
                       entryKey={story.id}
-                      initialNotes={story.name}
-                      globalDate={globalDate}
+                      initialNotes={`[sc-${story.id}] ${story.name}`}
                       projects={projects}
                       lineItems={lineItems}
 

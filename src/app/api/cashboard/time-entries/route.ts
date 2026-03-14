@@ -33,7 +33,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
-  // Cashboard accepts both "created_on" and "date" — try "date" first per their REST conventions
+  // Cashboard accepts "date" as the primary way to set the entry's day.
+  // Including both can help ensure it's set correctly.
   const payload = {
     time_entry: {
       line_item_id,
@@ -41,6 +42,7 @@ export async function POST(req: Request) {
       minutes,
       description,
       date,
+      created_on: date,
     },
   };
 
@@ -86,4 +88,40 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ ok: true }, { status: 201 });
   }
+}
+
+export async function GET(req: Request) {
+  const session = await auth();
+  if (!session?.user || session.user.email !== process.env.MY_SLACK_EMAIL) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(req.url);
+  const personId = searchParams.get('person_id');
+  
+  if (!personId) {
+    return NextResponse.json({ error: 'Missing person_id' }, { status: 400 });
+  }
+
+  // Fetch entries from the last 14 days by default to keep it snappy
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - 14);
+  const startDateStr = startDate.toISOString().split('T')[0];
+
+  const url = `https://api.cashboardapp.com/time_entries.json?person_id=${personId}&start_date=${startDateStr}`;
+  
+  const res = await fetch(url, {
+    headers: cbHeaders(),
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    return NextResponse.json(
+      { error: `Cashboard error ${res.status}` },
+      { status: 502 }
+    );
+  }
+
+  const data = await res.json();
+  return NextResponse.json(data);
 }
