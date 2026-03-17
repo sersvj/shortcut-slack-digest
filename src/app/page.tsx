@@ -18,7 +18,7 @@ import {
   ChevronUp,
   ArrowUp,
 } from 'lucide-react';
-import { ShortcutGroup, CategorizedStories, SlackChannel, AppConfig, CronConfig, TeamlessRequester } from '@/lib/types';
+import { ShortcutGroup, CategorizedStories, SlackChannel, AppConfig, CronConfig, TeamlessRequester, MemberDigest, SlackUser } from '@/lib/types';
 import { ClientCard } from '@/components/ClientCard';
 import { CronSettingsModal } from '@/components/CronSettingsModal';
 import { MembersView, MembersViewHandle } from '@/components/MembersView';
@@ -140,8 +140,34 @@ function DashboardInner() {
   const membersViewRef = useRef<MembersViewHandle>(null);
   const [summarySearch, setSummarySearch] = useState('');
   const [membersSearch, setMembersSearch] = useState('');
-  const [membersRefreshKey, setMembersRefreshKey] = useState(0);
   const [membersStats, setMembersStats] = useState({ loading: true, optedInCount: 0, total: 0 });
+  const [membersDigests, setMembersDigests] = useState<MemberDigest[]>([]);
+  const [membersSlackUsers, setMembersSlackUsers] = useState<SlackUser[]>([]);
+  const [membersLoaded, setMembersLoaded] = useState(false);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [membersLastRefreshed, setMembersLastRefreshed] = useState<Date | null>(null);
+  const [membersError, setMembersError] = useState<string | null>(null);
+
+  const loadMembersData = useCallback(async (forceRefresh = false) => {
+    if (membersLoaded && !forceRefresh) return;
+    setMembersLoading(true);
+    setMembersError(null);
+    try {
+      const [digestsRes, usersRes] = await Promise.all([
+        fetch('/api/shortcut/members/stories'),
+        fetch('/api/slack/users'),
+      ]);
+      if (!digestsRes.ok) throw new Error('Failed to load member digests');
+      setMembersDigests(await digestsRes.json());
+      if (usersRes.ok) setMembersSlackUsers(await usersRes.json());
+      setMembersLoaded(true);
+      setMembersLastRefreshed(new Date());
+    } catch (err: unknown) {
+      setMembersError(err instanceof Error ? err.message : 'Failed to load data');
+    } finally {
+      setMembersLoading(false);
+    }
+  }, [membersLoaded]);
   const [sendingAllMembers, setSendingAllMembers] = useState(false);
 
   // ---- Teamless stories state ----
@@ -551,7 +577,7 @@ function DashboardInner() {
 
               {/* Summary: Search (Active Teams tab only) */}
               <div className="flex-1 flex justify-center w-full lg:max-w-2xl order-1 lg:order-2">
-                <div className="relative group w-full max-w-xl">
+                <div suppressHydrationWarning className="relative group w-full max-w-xl">
                   <Search
                     size={14}
                     className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors ${
@@ -602,7 +628,7 @@ function DashboardInner() {
 
               {/* Team Tasks: Search */}
               <div className="flex-1 flex justify-center w-full lg:max-w-2xl order-1 lg:order-2">
-                <div className="relative group w-full max-w-xl">
+                <div suppressHydrationWarning className="relative group w-full max-w-xl">
                   <Search
                     size={14}
                     className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors ${
@@ -659,7 +685,7 @@ function DashboardInner() {
               {/* Team Members: Refresh */}
               <div className="flex items-center gap-3 order-2 lg:order-1 lg:min-w-[200px]">
                 <button
-                  onClick={() => setMembersRefreshKey((k) => k + 1)}
+                  onClick={() => loadMembersData(true)}
                   suppressHydrationWarning
                   disabled={membersStats.loading}
                   className="flex items-center gap-2 px-3 py-1.5 rounded-[6px] bg-[var(--color-surface-3)] border border-[var(--color-border)] hover:border-[var(--color-border-light)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] text-[13px] font-medium transition-colors disabled:opacity-50 shadow-sm"
@@ -667,11 +693,16 @@ function DashboardInner() {
                   <RefreshCw size={14} className={membersStats.loading ? 'animate-spin-fast' : ''} />
                   <span>Refresh</span>
                 </button>
+                {membersLastRefreshed && !membersStats.loading && (
+                  <span className="text-[11px] text-[var(--color-text-dim)] font-medium tabular-nums whitespace-nowrap" suppressHydrationWarning>
+                    Updated {membersLastRefreshed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
               </div>
 
               {/* Team Members: Search */}
               <div className="flex-1 flex justify-center w-full lg:max-w-2xl order-1 lg:order-2">
-                <div className="relative group w-full max-w-xl">
+                <div suppressHydrationWarning className="relative group w-full max-w-xl">
                   <Search
                     size={14}
                     className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors ${
@@ -741,7 +772,11 @@ function DashboardInner() {
           config={config}
           onConfigChange={saveConfig}
           search={membersSearch}
-          refreshKey={membersRefreshKey}
+          digests={membersDigests}
+          slackUsers={membersSlackUsers}
+          loading={membersLoading}
+          error={membersError}
+          onMount={loadMembersData}
           onStatsChange={setMembersStats}
         />
       ) : (

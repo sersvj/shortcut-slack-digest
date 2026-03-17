@@ -14,20 +14,21 @@ interface MembersViewProps {
   onConfigChange: (newConfig: AppConfig) => Promise<void>;
   /** Controlled search string, from the shared header bar */
   search: string;
-  /** Increment to trigger a fresh data fetch, from the shared Refresh button */
-  refreshKey: number;
+  /** Data and loading state, owned by the parent */
+  digests: MemberDigest[];
+  slackUsers: SlackUser[];
+  loading: boolean;
+  error: string | null;
+  /** Called on mount so the parent can trigger the initial data load */
+  onMount: () => void;
   /** Called whenever stats change so the header bar can update its labels */
   onStatsChange: (stats: { loading: boolean; optedInCount: number; total: number }) => void;
 }
 
 export const MembersView = forwardRef<MembersViewHandle, MembersViewProps>(function MembersView(
-  { config, onConfigChange, search, refreshKey, onStatsChange },
+  { config, onConfigChange, search, digests, slackUsers, loading, error, onMount, onStatsChange },
   ref
 ) {
-  const [digests, setDigests] = useState<MemberDigest[]>([]);
-  const [slackUsers, setSlackUsers] = useState<SlackUser[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const showToast = useCallback((type: 'success' | 'error', message: string) => {
@@ -35,26 +36,8 @@ export const MembersView = forwardRef<MembersViewHandle, MembersViewProps>(funct
     setTimeout(() => setToast(null), 4500);
   }, []);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [digestsRes, usersRes] = await Promise.all([
-        fetch('/api/shortcut/members/stories'),
-        fetch('/api/slack/users'),
-      ]);
-      if (!digestsRes.ok) throw new Error('Failed to load member digests');
-      setDigests(await digestsRes.json());
-      if (usersRes.ok) setSlackUsers(await usersRes.json());
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load data');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Load on mount and whenever refreshKey increments
-  useEffect(() => { loadData(); }, [loadData, refreshKey]);
+  // Trigger initial load from parent (no-op if already loaded)
+  useEffect(() => { onMount(); }, [onMount]);
 
   // Report stats upward whenever relevant values change
   const optedInCount = Object.values(config.memberMappings ?? {}).filter(
